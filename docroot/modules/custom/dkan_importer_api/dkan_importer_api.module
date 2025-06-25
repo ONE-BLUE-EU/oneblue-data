@@ -1,0 +1,24 @@
+<?php
+
+/**
+ * @file
+ * Contains dkan_importer_api.module.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+
+/**
+ * Implements hook_help().
+ */
+function dkan_importer_api_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    // Main module help for the dkan_importer_api module.
+    case 'help.page.dkan_importer_api':
+      $output = '';
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Provides API endpoint for importing CSV files with basic authentication.') . '</p>';
+      return $output;
+
+    default:
+  }
+}

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PHPUnit">
+    <option name="directories">
+      <list>
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/common/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/metastore/modules/metastore_search/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/datastore/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/datastore/modules/datastore_mysql_import/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/frontend/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/dkan_js_frontend/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/harvest/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/json_form_widget/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/metastore/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/modules/metastore/modules/metastore_admin/tests" />
+        <option value="$PROJECT_DIR$/docroot/modules/contrib/dkan/tests" />
+      </list>
+    </option>
+  </component>
+</project>

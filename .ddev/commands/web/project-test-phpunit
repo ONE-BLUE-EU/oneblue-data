@@ -1,0 +1,51 @@
+#!/bin/bash
+#ddev-generated
+
+## Description: Run PHPUnit tests for the project.
+## Usage: project-test-phpunit <arguments>
+
+TEST_PATH="docroot/modules/custom"
+PROJECT_TEST_CONFIG=$TEST_PATH/phpunit.xml
+TEST_SUITE="Custom Test Suite"
+PHPUNIT_BINARY=vendor/bin/phpunit
+
+if [[ ! -f $PROJECT_TEST_CONFIG ]]; then
+  echo "* PHPUnit config not found: $PROJECT_TEST_CONFIG"
+  echo "* A template config can be found at .ddev/misc/phpunit.xml"
+  exit 1
+fi
+
+# Is there a PHPUnit binary?
+if [[ ! -f $PHPUNIT_BINARY ]]; then
+  echo "* Unable to find PHPUnit executable at $PHPUNIT_BINARY"
+  echo "* Perform 'composer install'."
+  exit 1
+fi
+
+# Use the weitzman/dtt bootstrap if it exists.
+# Otherwise, Drupal's bootstrap.
+# TODO Eventually we can remove this and just use Drupal core.
+BOOTSTRAP_PATH=$DDEV_COMPOSER_ROOT/vendor/weitzman/drupal-test-traits/src/bootstrap.php
+if [[ ! -f $BOOTSTRAP_PATH ]] ; then
+  BOOTSTRAP_PATH=$DDEV_COMPOSER_ROOT/$DOCROOT/core/tests/bootstrap.php
+fi
+
+# Ensure prophecy.
+# TODO: Remove this when Drupal core no longer requires it.
+composer require --dev phpspec/prophecy-phpunit:^2 --no-progress --no-audit --no-interaction
+
+echo "Starting PHPUnit test run."
+DDEV_PATH="$PWD"
+cd $TEST_PATH || exit 1
+DRUPAL_ROOT="/var/www/html/docroot" \
+  SIMPLETEST_BASE_URL=$DDEV_PRIMARY_URL \
+  SIMPLETEST_DB="mysql://db:db@$DDEV_PROJECT-db:3306/db" \
+  $DDEV_PATH/$PHPUNIT_BINARY \
+  --testsuite "$TEST_SUITE" \
+  --bootstrap $BOOTSTRAP_PATH \
+  --fail-on-risky \
+  "$@"
+PROJECT_TEST_RESULT=$?
+
+echo "Project PHPUnit tests complete."
+exit $PROJECT_TEST_RESULT

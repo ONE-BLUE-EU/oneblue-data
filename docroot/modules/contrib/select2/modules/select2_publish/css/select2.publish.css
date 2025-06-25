@@ -1,0 +1,6 @@
+.select2-container .select2-selection--single .select2-selection__rendered.unpublished,
+.select2-container .select2-selection__choice.unpublished,
+.select2-container .select2-results__option--selectable.unpublished,
+.select2-container .select2-results__option--highlighted.select2-results__option--selectable.unpublished {
+  color: #e62600;
+}

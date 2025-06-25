@@ -1,0 +1,28 @@
+name: ddev-dkan
+repository: getdkan/ddev-dkan
+version: 1.2.5
+install_date: "2025-05-18T13:35:01+03:00"
+project_files:
+    - commands/cypress/cypress
+    - commands/host/dkan-demo
+    - commands/host/dkan-frontend-test-cypress
+    - commands/host/dkan-init
+    - commands/host/dkan-module-test-cypress
+    - commands/host/dkan-module-test-cypress-ci
+    - commands/host/dkan-sample-content
+    - commands/host/project-test-cypress
+    - commands/web/dkan-frontend-build
+    - commands/web/dkan-frontend-install
+    - commands/web/dkan-get-env-for-phpunit
+    - commands/web/dkan-phpunit
+    - commands/web/dkan-site-install
+    - commands/web/dkan-test-phpunit
+    - commands/web/dkan-test-users
+    - commands/web/project-test-phpunit
+    - misc/docker-compose.cypress.yaml
+    - misc/phpunit.xml
+    - misc/testUsers.json
+    - php/dkan-php.ini
+    - mysql/datastore.cnf
+global_files: []
+removal_actions: []

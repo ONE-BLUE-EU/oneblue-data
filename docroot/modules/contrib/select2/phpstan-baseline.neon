@@ -1,0 +1,61 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^\\\\Drupal calls should be avoided in classes, use dependency injection instead$#"
+			count: 1
+			path: src/Plugin/Field/FieldWidget/Select2EntityReferenceWidget.php
+
+		-
+			message: "#^Access to an undefined property Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:\\$configuration\\.$#"
+			count: 2
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Access to an undefined property Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:\\$handler\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Call to an undefined method Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:getExposedFilterFieldId\\(\\)\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Call to an undefined method Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:t\\(\\)\\.$#"
+			count: 3
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:buildConfigurationForm\\(\\) calls parent\\:\\:buildConfigurationForm\\(\\) but Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2 does not extend any class\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:defaultConfiguration\\(\\) calls parent\\:\\:defaultConfiguration\\(\\) but Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2 does not extend any class\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2\\:\\:exposedFormAlter\\(\\) calls parent\\:\\:exposedFormAlter\\(\\) but Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\filter\\\\Select2 does not extend any class\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/filter/Select2.php
+
+		-
+			message: "#^Access to an undefined property Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\sort\\\\Select2\\:\\:\\$sortElements\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/sort/Select2.php
+
+		-
+			message: "#^Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\sort\\\\Select2\\:\\:exposedFormAlter\\(\\) calls parent\\:\\:exposedFormAlter\\(\\) but Drupal\\\\select2\\\\Plugin\\\\better_exposed_filters\\\\sort\\\\Select2 does not extend any class\\.$#"
+			count: 1
+			path: src/Plugin/better_exposed_filters/sort/Select2.php
+
+		-
+			message: "#^Property Drupal\\\\Tests\\\\select2\\\\Kernel\\\\Element\\\\Select2Test\\:\\:\\$modules property must be protected\\.$#"
+			count: 1
+			path: tests/src/Kernel/Element/Select2Test.php
+
+		-
+			message: "#^Property Drupal\\\\Tests\\\\select2\\\\Kernel\\\\Select2KernelTestBase\\:\\:\\$modules property must be protected\\.$#"
+			count: 1
+			path: tests/src/Kernel/Select2KernelTestBase.php

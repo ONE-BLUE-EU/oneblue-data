@@ -1,0 +1,7 @@
+upload csv files:
+  title: 'Upload CSV files'
+  description: 'Allows users to upload CSV files via the API'
+
+delete csv files:
+  title: 'Delete CSV files'
+  description: 'Allows users to delete CSV files via the API'

@@ -1,0 +1,111 @@
+.select2-container--claro {
+  @import "../../../../libraries/select2/src/scss/theme/default/_single.scss";
+  @import "../../../../libraries/select2/src/scss/theme/default/_multiple.scss";
+  @import "default";
+}
+
+.select2-container--claro {
+
+
+  .select2-selection--multiple {
+    line-height: var(--input-line-height);
+    padding-block: calc(var(--space-xs) - 1px);
+    padding-inline: var(--space-xs);
+    min-height: calc(var(--input-padding-vertical) * 2 + var(--input-line-height));
+    border: 1px solid var(--input-border-color);
+
+    .select2-selection__rendered {
+      margin: 0; /* reset select2 */
+    }
+
+    .select2-search--inline {
+      display: inline-block;
+      padding: var(--space-xs) 0;
+      line-height: var(--space-m);
+
+      .select2-search__field {
+        margin: 0;
+      }
+    }
+
+    /*
+     * Claro chips design according to figma.
+     */
+    .select2-selection__choice {
+      background-color: #e9ecf1;
+      border: 1px solid transparent !important;
+      border-radius: 1.5rem;
+      display: inline-block;
+      font-size: var(--font-size-s);
+      font-weight: 500;
+      line-height: 1rem;
+      margin-right: var(--space-xs);
+      margin-top: 0;
+      padding: calc(var(--space-xs) - 1px);
+
+      [dir=rtl] & {
+        margin: 5px 0 0 0.35rem;
+      }
+
+      /*
+       * 1. Additional color see figma.
+       */
+      .select2-selection__choice__remove {
+        float: right;
+        position: relative;
+        border-radius: 50%;
+        color: #e9ecf1; /* 1 */
+        font-size: 0;
+        font-weight: 400;
+        line-height: 1rem;
+        height: 1rem;
+        width: 1rem;
+        background-color: #999aa3; /* 1 */
+
+        span {
+          height: 1rem;
+        }
+
+        &:before {
+          background-color: #e9ecf1;
+          content: "";
+          left: 0;
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18px' height='18px' viewBox='0 0 28 28'%3E%3Cpath stroke='%23000000' stroke-width='2.25' d='M19,9L9,19'/%3E%3Cpath stroke='%23000000' stroke-width='2.25' d='M19,19L9,9'/%3E%3C/svg%3E%0A");
+          mask-repeat: no-repeat;
+          mask-position: center center;
+          position: absolute;
+          height: 100%;
+          width: 100%;
+        }
+
+        &:hover {
+          background-color: var(--color-text);
+        }
+      }
+    }
+  }
+
+  /*
+   * Single widget.
+   */
+  .select2-selection--single {
+    line-height: var(--input-line-height);
+    padding-block: calc(var(--space-xs) - 1px);
+    padding-inline: var(--space-xs);
+    min-height: calc(var(--input-padding-vertical) * 2 + var(--input-line-height));
+    border: 1px solid var(--input-border-color);
+    border-radius: var(--border-m);
+
+    /*
+     * Vertically align arrow.
+     */
+    .select2-selection__arrow {
+      min-height: calc(((var(--input-padding-vertical) + var(--input-border-size)) * 2) + var(--input-line-height)); /* iOS. */
+      width: 25px;
+
+      b {
+        border-color: var(--color-text) transparent transparent transparent;
+      }
+    }
+  }
+}

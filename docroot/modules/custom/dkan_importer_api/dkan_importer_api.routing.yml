@@ -1,0 +1,20 @@
+dkan_importer_api.upload:
+  path: '/api/importer/upload'
+  defaults:
+    _controller: '\Drupal\dkan_importer_api\Controller\ImporterController::uploadCsv'
+  requirements:
+    _permission: 'upload csv files'
+    _method: 'POST'
+  options:
+    _auth: ['basic_auth']
+
+dkan_importer_api.delete:
+  path: '/api/importer/delete/{filename}'
+  defaults:
+    _controller: '\Drupal\dkan_importer_api\Controller\ImporterController::deleteCsv'
+  requirements:
+    _permission: 'delete csv files'
+    _method: 'POST'
+    filename: '.+'
+  options:
+    _auth: ['basic_auth']

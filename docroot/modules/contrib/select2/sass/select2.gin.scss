@@ -1,0 +1,208 @@
+.select2-container--gin {
+  @import "../../../../libraries/select2/src/scss/theme/default/_single.scss";
+  @import "../../../../libraries/select2/src/scss/theme/default/_multiple.scss";
+  @import "default";
+}
+
+.select2-container--gin {
+
+  &.select2-container--focus {
+    border-radius: var(--gin-border-m);
+    box-shadow: 0 0 0 1px var(--gin-color-focus-border), 0 0 0 4px var(--gin-color-focus);
+    outline: none;
+  }
+
+  .select2-selection--multiple {
+    color: var(--gin-color-text);
+    line-height: var(--input-line-height);
+    padding-block: calc(var(--space-xs) - 1px);
+    padding-inline: var(--space-xs);
+    min-height: calc(var(--input-padding-vertical) * 2 + var(--input-line-height));
+    background-color: var(--gin-bg-input);
+    border: 1px solid var(--gin-border-color-form-element);
+    border-radius: var(--gin-border-m);
+    transition: var(--gin-transition);
+
+    .select2-selection__rendered {
+      margin: 0; /* reset select2 */
+    }
+
+    .select2-search--inline {
+      display: inline-block;
+      padding: var(--space-xs) 0;
+      line-height: var(--space-m);
+
+      .select2-search__field {
+        margin: 0;
+      }
+    }
+
+    /*
+     * Claro chips design according to figma
+     *
+     * 1. Additional color see figma.
+     * 2. transparent border for high contrast mode.
+     * 3. ~24px, figma says 25px
+     * 4. ~14px bold, see figma
+     * 5. width detracted by transparent border
+     */
+    .select2-selection__choice {
+      background-color: #e9ecf1; /* 1 */
+      border: 1px solid transparent !important; /* 2 */
+      border-radius: 1.5rem; /* 3 */
+      font-size: var(--font-size-s); /* 0.889rem */ /* 4 */
+      font-weight: 500; /* 4 */
+      line-height: 1rem;
+      margin-left: 0;
+      margin-right: var(--space-xs);
+      margin-top: 0;
+      padding: calc(var(--space-xs) - 1px);
+
+      [dir=rtl] & {
+        margin: 5px 0 0 0.35rem;
+      }
+
+      /*
+       * 1. Additional color see figma.
+       */
+      .select2-selection__choice__remove {
+        float: right;
+        position: relative;
+        border-radius: 50%;
+        color: #e9ecf1; /* 1 */
+        font-size: 0;
+        font-weight: 400;
+        line-height: 1rem;
+        height: 1rem;
+        width: 1rem;
+        background-color: #999aa3; /* 1 */
+
+        span {
+          height: 1rem;
+        }
+
+        &:before {
+          background-color: #e9ecf1;
+          content: "";
+          left: 0;
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18px' height='18px' viewBox='0 0 28 28'%3E%3Cpath stroke='%23000000' stroke-width='2.25' d='M19,9L9,19'/%3E%3Cpath stroke='%23000000' stroke-width='2.25' d='M19,19L9,9'/%3E%3C/svg%3E%0A");
+          mask-repeat: no-repeat;
+          mask-position: center center;
+          position: absolute;
+          height: 100%;
+          width: 100%;
+        }
+
+        &:hover {
+          background-color: var(--gin-color-text);
+        }
+      }
+    }
+  }
+
+  /*
+   * Single widget.
+   */
+  .select2-selection--single {
+    color: var(--gin-color-text);
+    line-height: var(--input-line-height);
+    padding-block: calc(var(--space-xs) - 1px);
+    padding-inline: var(--space-xs);
+    min-height: calc(var(--input-padding-vertical) * 2 + var(--input-line-height));
+    background-color: var(--gin-bg-input);
+    border: 1px solid var(--gin-border-color-form-element);
+    border-radius: var(--gin-border-m);
+    transition: var(--gin-transition);
+
+    .select2-selection__rendered {
+      color: var(--gin-color-text);
+    }
+
+    /*
+     * Vertically align arrow.
+     */
+    .select2-selection__arrow {
+      min-height: calc(((var(--input-padding-vertical) + var(--input-border-size)) * 2) + var(--input-line-height));
+      width: 25px;
+
+      b {
+        border-color: var(--gin-color-text) transparent transparent transparent;
+      }
+    }
+  }
+
+  .select2-selection:focus {
+      box-shadow: 0 0 0 2px var(--color-white), 0 0 0 5px var(--gin-color-focus);
+      outline: 0;
+  }
+
+  .select2-selection:hover {
+    border-color: var(--gin-color-text);
+    box-shadow: inset 0 0 0 var(--input-border-size) var(--gin-color-text);
+  }
+
+  .select2-search--dropdown .select2-search__field:focus {
+    box-shadow: 0 0 0 2px var(--color-white), 0 0 0 5px var(--gin-color-focus);
+    outline: 0;
+  }
+
+  .select2-search--dropdown .select2-search__field:hover:focus {
+    box-shadow: 0 0 0 2px var(--color-white), 0 0 0 5px var(--gin-color-focus), inset 0 0 0 var(--input-border-size) var(--gin-color-focus);
+  }
+
+  .select2-results__option {
+    box-sizing: border-box;
+    min-height: calc(((var(--input-padding-vertical) + var(--input-border-size)) * 2) + var(--input-line-height));
+    padding: var(--input-padding-vertical) var(--input-padding-horizontal);
+
+    &[aria-selected=true] {
+      background-color: #e9ecf1; /* Additional color, see figma */
+    }
+  }
+  .select2-results__option--highlighted[aria-selected] {
+    background-color: var(--gin-color-primary-active);
+    color: var(--color-white);
+  }
+
+  .select2-dropdown--above,
+  .select2-dropdown--above .select2-search--dropdown .select2-search__field,
+  .select2-dropdown--above .select2-results__options {
+    border-top-left-radius : var(--gin-border-m);
+    border-top-right-radius : var(--gin-border-m);
+  }
+
+  .select2-dropdown--below,
+  .select2-dropdown--below .select2-search--dropdown .select2-search__field,
+  .select2-dropdown--below .select2-results__options {
+    border-bottom-left-radius : var(--gin-border-m);
+    border-bottom-right-radius : var(--gin-border-m);
+  }
+
+  .select2-dropdown--above,
+  .select2-dropdown--below {
+    .select2-search--dropdown ~ .select2-results .select2-results__options {
+      border-radius: 0;
+    }
+  }
+
+  .gin--dark-mode & {
+
+    .select2-selection--single,
+    .select2-selection--multiple,
+    .select2-search__field,
+    .select2-dropdown {
+      background-color: var(--gin-bg-layer2);
+      color: var(--gin-color-text);
+    }
+    .select2-results__option[aria-selected=true] {
+      background-color: var(--gin-bg-layer4);
+    }
+    .select2-selection__choice,
+    .select2-results__option--highlighted[aria-selected] {
+      background: var(--gin-bg-layer);
+    }
+    .select2-selection--multiple .select2-selection__choice .select2-selection__choice__remove:before {
+      background: var(--gin-bg-layer);
+    }
+  }
+}
