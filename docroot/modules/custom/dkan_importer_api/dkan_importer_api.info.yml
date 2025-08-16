@@ -1,6 +1,6 @@
 name: DKAN Importer API
 type: module
-description: 'Provides custom API endpoints for managing DKAN CSV distribution files'
+description: 'Provides an API endpoint (/api/importer/upload) for importing CSV files with basic authentication'
 core_version_requirement: ^9 || ^10
 package: DKAN
 dependencies:
