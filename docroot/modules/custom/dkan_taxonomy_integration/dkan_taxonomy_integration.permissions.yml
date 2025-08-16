@@ -1,0 +1,9 @@
+administer dataset taxonomy:
+  title: 'Administer dataset taxonomy'
+  description: 'Create, edit, and delete taxonomy vocabularies and terms for datasets.'
+  restrict access: TRUE
+
+manage dataset taxonomy terms:
+  title: 'Manage dataset taxonomy terms'
+  description: 'Add, edit, and delete taxonomy terms for datasets.'
+  restrict access: TRUE

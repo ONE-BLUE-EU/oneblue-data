@@ -1,0 +1,1125 @@
+<?php
+
+/**
+ * @file
+ * DKAN Taxonomy Integration module.
+ *
+ * Provides seamless integration between custom taxonomy vocabularies and DKAN datasets.
+ */
+
+use Drupal\Core\DependencyInjection\ContainerBuilder;
+
+/**
+ * Helper function to get the module logger instance.
+ */
+function _dkan_taxonomy_integration_logger() {
+  return \Drupal::logger('dkan_taxonomy_integration');
+}
+
+/**
+ * Implements hook_help().
+ */
+function dkan_taxonomy_integration_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  if (empty($route_name) || empty($route_match)) {
+    return '';
+  }
+
+  switch ($route_name) {
+    case 'help.page.dkan_taxonomy_integration':
+      return '<p>' . t('Provides integration between custom taxonomy vocabularies and DKAN datasets.') . '</p>';
+  }
+
+  return '';
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function dkan_taxonomy_integration_form_alter(&$form, \Drupal\Core\Form\FormStateInterface $form_state, $form_id) {
+  // Validate inputs
+  if (empty($form) || empty($form_state) || empty($form_id)) {
+    return;
+  }
+
+  // Add custom styling for taxonomy fields on dataset forms.
+  if (is_string($form_id) && strpos($form_id, 'node_data_') === 0) {
+    // Get all custom taxonomy fields on the data node type.
+    $custom_fields = _dkan_taxonomy_integration_get_custom_taxonomy_fields();
+
+    if (!empty($custom_fields) && is_array($custom_fields)) {
+      foreach ($custom_fields as $field_name => $field_info) {
+        if (!empty($field_name) && isset($form[$field_name]) && is_array($form[$field_name])) {
+          // Ensure the field uses the autocomplete tags widget.
+          if (isset($form[$field_name]['widget']['#type']) &&
+              is_string($form[$field_name]['widget']['#type']) &&
+              $form[$field_name]['widget']['#type'] === 'entity_reference_autocomplete_tags') {
+            // Set placeholder text.
+            $form[$field_name]['widget']['#placeholder'] = t('Start typing to search...');
+          }
+        }
+      }
+    }
+  }
+}
+
+
+
+/**
+ * Implements hook_entity_presave().
+ */
+function dkan_taxonomy_integration_entity_presave(\Drupal\Core\Entity\EntityInterface $entity) {
+  // Validate entity
+  if (empty($entity) || !is_object($entity)) {
+    return;
+  }
+
+  try {
+    $entity_type_id = $entity->getEntityTypeId();
+
+    if ($entity_type_id === 'node') {
+      $bundle = $entity->bundle();
+
+      if (!empty($bundle) && $bundle === 'data') {
+        // Integrate custom taxonomy fields into JSON metadata before saving.
+        _dkan_taxonomy_integration_integrate_taxonomy_into_metadata($entity);
+      }
+    }
+    elseif ($entity_type_id === 'taxonomy_term') {
+      // Handle taxonomy term updates to trigger dataset saves
+      _dkan_taxonomy_integration_handle_taxonomy_term_update($entity);
+
+      // Automatically create/update taxonomy_term schema item
+      _dkan_taxonomy_integration_create_taxonomy_term_schema_item($entity);
+    }
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error in entity_presave: @message', ['@message' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Implements hook_entity_update().
+ */
+function dkan_taxonomy_integration_entity_update(\Drupal\Core\Entity\EntityInterface $entity) {
+  // Validate entity
+  if (empty($entity) || !is_object($entity)) {
+    return;
+  }
+
+  try {
+    $entity_type_id = $entity->getEntityTypeId();
+
+    if ($entity_type_id === 'taxonomy_term') {
+      // Handle taxonomy term updates after save to ensure all changes are captured
+      _dkan_taxonomy_integration_handle_taxonomy_term_update($entity);
+
+      // Automatically create/update taxonomy_term schema item
+      _dkan_taxonomy_integration_create_taxonomy_term_schema_item($entity);
+    }
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error in entity_update: @message', ['@message' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Implements hook_entity_insert().
+ */
+function dkan_taxonomy_integration_entity_insert(\Drupal\Core\Entity\EntityInterface $entity) {
+  // Validate entity
+  if (empty($entity) || !is_object($entity)) {
+    return;
+  }
+
+  try {
+    $entity_type_id = $entity->getEntityTypeId();
+
+    if ($entity_type_id === 'taxonomy_term') {
+      // Handle new taxonomy terms to trigger dataset saves if they're immediately assigned
+      _dkan_taxonomy_integration_handle_taxonomy_term_update($entity);
+
+      // Automatically create taxonomy_term schema item for new terms
+      _dkan_taxonomy_integration_create_taxonomy_term_schema_item($entity);
+    }
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error in entity_insert: @message', ['@message' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Implements hook_entity_delete().
+ */
+function dkan_taxonomy_integration_entity_delete(\Drupal\Core\Entity\EntityInterface $entity) {
+  // Validate entity
+  if (empty($entity) || !is_object($entity)) {
+    return;
+  }
+
+  try {
+    $entity_type_id = $entity->getEntityTypeId();
+
+    if ($entity_type_id === 'taxonomy_term') {
+      // Handle taxonomy term deletion to remove from schema
+      _dkan_taxonomy_integration_delete_taxonomy_term_schema_item($entity);
+    }
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error in entity_delete: @message', ['@message' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Implements hook_taxonomy_vocabulary_delete().
+ */
+function dkan_taxonomy_integration_taxonomy_vocabulary_delete($vocabulary) {
+  if (empty($vocabulary) || !is_object($vocabulary)) {
+    return;
+  }
+
+  try {
+    $vocabulary_id = $vocabulary->id();
+    if (empty($vocabulary_id)) {
+      return;
+    }
+
+    _dkan_taxonomy_integration_logger()->info('Taxonomy vocabulary "@vocabulary" (ID: @id) deleted, cleaning up metadata from datasets and schema items', [
+      '@vocabulary' => $vocabulary->label(),
+      '@id' => $vocabulary_id
+    ]);
+
+    // Remove the field from dataset node type
+    _dkan_taxonomy_integration_remove_field_from_dataset($vocabulary_id);
+
+    // Clean up metadata from all datasets
+    _dkan_taxonomy_integration_cleanup_metadata_from_datasets($vocabulary_id);
+
+    // Clean up all taxonomy_term schema items from this vocabulary
+    _dkan_taxonomy_integration_cleanup_vocabulary_schema_items($vocabulary_id);
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error in taxonomy vocabulary delete hook: @message', [
+      '@message' => $e->getMessage()
+    ]);
+  }
+}
+
+/**
+ * Helper function to get custom taxonomy fields.
+ */
+function _dkan_taxonomy_integration_get_custom_taxonomy_fields() {
+  $fields = [];
+
+  try {
+    // Check if entity type manager service is available
+    if (!\Drupal::hasService('entity_type.manager')) {
+      _dkan_taxonomy_integration_logger()->error('Entity type manager service not available');
+      return $fields;
+    }
+
+    $entity_type_manager = \Drupal::entityTypeManager();
+    if (empty($entity_type_manager)) {
+      _dkan_taxonomy_integration_logger()->error('Entity type manager is null');
+      return $fields;
+    }
+
+    // Get all field configurations for the data node type.
+    $field_configs = $entity_type_manager
+      ->getStorage('field_config')
+      ->loadByProperties([
+        'entity_type' => 'node',
+        'bundle' => 'data',
+      ]);
+
+    if (!empty($field_configs) && is_array($field_configs)) {
+      foreach ($field_configs as $field_config) {
+        if (empty($field_config) || !is_object($field_config)) {
+          continue;
+        }
+
+        $field_name = $field_config->getName();
+        if (empty($field_name) || !is_string($field_name)) {
+          continue;
+        }
+
+        // Only include custom taxonomy fields (field_* that reference taxonomy_term).
+        if (strpos($field_name, 'field_') === 0) {
+          $field_storage = $field_config->getFieldStorageDefinition();
+
+          if (!empty($field_storage) && is_object($field_storage)) {
+            $field_type = $field_storage->getType();
+            if (!empty($field_type) && $field_type === 'entity_reference') {
+              $settings = $field_storage->getSettings();
+
+              if (!empty($settings) && is_array($settings) &&
+                  isset($settings['target_type']) &&
+                  $settings['target_type'] === 'taxonomy_term') {
+
+                $vocabulary_id = _dkan_taxonomy_integration_get_vocabulary_id_from_field($field_config);
+                $field_label = $field_config->getLabel();
+
+                $fields[$field_name] = [
+                  'label' => !empty($field_label) ? $field_label : $field_name,
+                  'vocabulary_id' => !empty($vocabulary_id) ? $vocabulary_id : '',
+                ];
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  catch (\Exception $e) {
+    // Log error but don't break the data retrieval.
+    _dkan_taxonomy_integration_logger()->error('Error getting custom taxonomy fields: @message', ['@message' => $e->getMessage()]);
+  }
+
+  return $fields;
+}
+
+/**
+ * Helper function to get vocabulary ID from field configuration.
+ */
+function _dkan_taxonomy_integration_get_vocabulary_id_from_field($field_config) {
+  if (empty($field_config) || !is_object($field_config)) {
+    return NULL;
+  }
+
+  try {
+    $settings = $field_config->getSettings();
+
+    if (!empty($settings) && is_array($settings) &&
+        isset($settings['handler_settings']['target_bundles']) &&
+        is_array($settings['handler_settings']['target_bundles'])) {
+      $target_bundles = $settings['handler_settings']['target_bundles'];
+      $vocabulary_id = reset($target_bundles);
+      return !empty($vocabulary_id) ? $vocabulary_id : NULL;
+    }
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error getting vocabulary ID from field: @message', ['@message' => $e->getMessage()]);
+  }
+
+  return NULL;
+}
+
+/**
+ * Helper function to integrate taxonomy fields into JSON metadata.
+ */
+function _dkan_taxonomy_integration_integrate_taxonomy_into_metadata($entity) {
+  if (empty($entity) || !is_object($entity)) {
+    return;
+  }
+
+  try {
+    // Check if the metastore service is available
+    if (!\Drupal::hasService('dkan.metastore.metastore_item_factory')) {
+      _dkan_taxonomy_integration_logger()->error('DKAN metastore service not available');
+      return;
+    }
+
+    // Get the JSON metadata field.
+    $metadata_field = \Drupal::service('dkan.metastore.metastore_item_factory')::getMetadataField();
+    if (empty($metadata_field) || !is_string($metadata_field)) {
+      _dkan_taxonomy_integration_logger()->error('Metadata field name is empty or invalid');
+      return;
+    }
+
+    if (!$entity->hasField($metadata_field)) {
+      return;
+    }
+
+    // Get current JSON metadata.
+    $json_value = $entity->get($metadata_field)->value;
+    if (empty($json_value) || !is_string($json_value)) {
+      return;
+    }
+
+    $metadata = json_decode($json_value, TRUE);
+    if (!$metadata || !is_array($metadata)) {
+      return;
+    }
+
+    // Get custom taxonomy fields that are currently configured.
+    $custom_fields = _dkan_taxonomy_integration_get_custom_taxonomy_fields();
+
+    // Track which fields we've processed to handle removals.
+    $processed_fields = [];
+
+    // Add each custom taxonomy field's data to the metadata.
+    if (!empty($custom_fields) && is_array($custom_fields)) {
+      foreach ($custom_fields as $field_name => $field_info) {
+        if (empty($field_name) || !is_string($field_name)) {
+          continue;
+        }
+
+        if ($entity->hasField($field_name)) {
+          $terms = $entity->get($field_name)->referencedEntities();
+
+          // Only add to metadata if there are actual terms assigned
+          if (!empty($terms) && is_array($terms)) {
+            $term_objects = [];
+
+            foreach ($terms as $term) {
+              if (empty($term) || !is_object($term)) {
+                continue;
+              }
+
+              try {
+                $term_uuid = $term->uuid();
+                $term_name = $term->getName();
+
+                if (!empty($term_uuid) && !empty($term_name)) {
+                  $term_objects[] = [
+                    'identifier' => $term_uuid,
+                    'data' => $term_name,
+                  ];
+                }
+              } catch (\Exception $e) {
+                _dkan_taxonomy_integration_logger()->error('Error processing term: @message', ['@message' => $e->getMessage()]);
+                continue;
+              }
+            }
+
+            // Add to metadata using the API field name.
+            $api_field_name = _dkan_taxonomy_integration_get_api_field_name($field_name);
+
+            // Only add if the field name is valid and doesn't conflict with DKAN's processing
+            if (!empty($api_field_name) && _dkan_taxonomy_integration_is_valid_api_field_name($api_field_name)) {
+              $metadata[$api_field_name] = $term_objects;
+              $processed_fields[] = $api_field_name;
+
+              // Get term names for logging
+              $term_names = [];
+              foreach ($term_objects as $term_obj) {
+                if (isset($term_obj['data'])) {
+                  $term_names[] = $term_obj['data'];
+                }
+              }
+              $term_names_str = implode(', ', $term_names);
+
+              _dkan_taxonomy_integration_logger()->info('Added @field to metadata for dataset "@dataset" (ID: @id) with @count terms: @terms', [
+                '@field' => $api_field_name,
+                '@dataset' => $entity->getTitle(),
+                '@id' => $entity->id(),
+                '@count' => count($term_objects),
+                '@terms' => $term_names_str
+              ]);
+            }
+          }
+        }
+      }
+    }
+
+    // Note: Cleanup of removed taxonomy fields is now handled by hook_taxonomy_vocabulary_delete()
+    // This ensures cleanup happens immediately when a vocabulary is deleted, rather than
+    // checking on every dataset save.
+
+    // Update the JSON metadata field.
+    $encoded_metadata = json_encode($metadata);
+    if ($encoded_metadata !== FALSE) {
+      $entity->set($metadata_field, $encoded_metadata);
+    } else {
+      _dkan_taxonomy_integration_logger()->error('Failed to encode metadata to JSON');
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error integrating taxonomy into metadata: @message', ['@message' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Helper function to convert Drupal field name to API field name.
+ */
+function _dkan_taxonomy_integration_get_api_field_name($field_name) {
+  if (empty($field_name) || !is_string($field_name)) {
+    return '';
+  }
+
+  return \Drupal\dkan_taxonomy_integration\Utils\TaxonomyDataProcessor::convertFieldNameToApiName($field_name);
+}
+
+/**
+ * Helper function to validate API field names.
+ */
+function _dkan_taxonomy_integration_is_valid_api_field_name($field_name) {
+  return \Drupal\dkan_taxonomy_integration\Utils\TaxonomyDataProcessor::validateApiFieldName($field_name);
+}
+
+/**
+ * Helper function to handle taxonomy term updates and trigger dataset saves.
+ */
+function _dkan_taxonomy_integration_handle_taxonomy_term_update($term) {
+  if (empty($term) || !is_object($term)) {
+    return;
+  }
+
+  try {
+    // Check if this is a taxonomy term
+    if ($term->getEntityTypeId() !== 'taxonomy_term') {
+      return;
+    }
+
+    // Get the vocabulary ID
+    $vocabulary_id = $term->bundle();
+    if (empty($vocabulary_id)) {
+      return;
+    }
+
+    // Check if this vocabulary is used in any custom taxonomy fields
+    $custom_fields = _dkan_taxonomy_integration_get_custom_taxonomy_fields();
+    $relevant_field = NULL;
+
+    foreach ($custom_fields as $field_name => $field_info) {
+      if (!empty($field_info['vocabulary_id']) && $field_info['vocabulary_id'] === $vocabulary_id) {
+        $relevant_field = $field_name;
+        break;
+      }
+    }
+
+    // If this vocabulary is not used in any custom taxonomy fields, skip
+    if (empty($relevant_field)) {
+      return;
+    }
+
+    // Find all datasets that use this term
+    $datasets = _dkan_taxonomy_integration_find_datasets_with_term($term);
+
+    if (!empty($datasets) && is_array($datasets)) {
+      _dkan_taxonomy_integration_logger()->info('Found @count datasets using term "@term" (ID: @id), triggering immediate saves', [
+        '@count' => count($datasets),
+        '@term' => $term->getName(),
+        '@id' => $term->id()
+      ]);
+
+      // Save each dataset to trigger metadata updates
+      foreach ($datasets as $dataset) {
+        if (!empty($dataset) && is_object($dataset)) {
+          try {
+            $dataset->save();
+            _dkan_taxonomy_integration_logger()
+              ->info('Triggered save for dataset "@dataset" (ID: @id) due to term "@term" update',
+                [
+                  '@dataset' => $dataset->getTitle(),
+                  '@id' => $dataset->id(),
+                  '@term' => $term->getName()
+                ]
+              );
+
+            // Force immediate processing by clearing relevant caches
+            _dkan_taxonomy_integration_force_immediate_update($dataset);
+
+            // Additional immediate processing for UI updates
+            _dkan_taxonomy_integration_force_ui_immediate_update($dataset);
+
+          } catch (\Exception $e) {
+            _dkan_taxonomy_integration_logger()->error('Error saving dataset "@dataset" (ID: @id): @message', [
+              '@dataset' => $dataset->getTitle(),
+              '@id' => $dataset->id(),
+              '@message' => $e->getMessage()
+            ]);
+          }
+        }
+      }
+    } else {
+      _dkan_taxonomy_integration_logger()->info('No datasets found using term "@term" (ID: @id)', [
+        '@term' => $term->getName(),
+        '@id' => $term->id()
+      ]);
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error handling taxonomy term update: @message', ['@message' => $e->getMessage()]);
+  }
+}
+
+/**
+ * Helper function to find datasets that use a specific taxonomy term.
+ */
+function _dkan_taxonomy_integration_find_datasets_with_term($term) {
+  if (empty($term) || !is_object($term)) {
+    return [];
+  }
+
+  try {
+    // Check if entity type manager service is available
+    if (!\Drupal::hasService('entity_type.manager')) {
+      _dkan_taxonomy_integration_logger()->error('Entity type manager service not available');
+      return [];
+    }
+
+    $entity_type_manager = \Drupal::entityTypeManager();
+    if (empty($entity_type_manager)) {
+      _dkan_taxonomy_integration_logger()->error('Entity type manager is null');
+      return [];
+    }
+
+    $term_id = $term->id();
+    $vocabulary_id = $term->bundle();
+
+    if (empty($term_id) || empty($vocabulary_id)) {
+      return [];
+    }
+
+    // Get the field name for this vocabulary
+    $field_name = 'field_' . $vocabulary_id;
+
+    // Find all data nodes that reference this term
+    $query = $entity_type_manager
+      ->getStorage('node')
+      ->getQuery()
+      ->condition('type', 'data')
+      ->condition($field_name, $term_id)
+      ->accessCheck(FALSE);
+
+    $nids = $query->execute();
+
+    if (!empty($nids) && is_array($nids)) {
+      $datasets = $entity_type_manager
+        ->getStorage('node')
+        ->loadMultiple($nids);
+
+      return is_array($datasets) ? $datasets : [];
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error finding datasets with term: @message', ['@message' => $e->getMessage()]);
+  }
+
+  return [];
+}
+
+/**
+ * Helper function to process metastore queues immediately.
+ */
+function _dkan_taxonomy_integration_process_queues($dataset) {
+  if (!empty($dataset) && is_object($dataset) && \Drupal::hasService('queue')) {
+    $queue_names = \Drupal\dkan_taxonomy_integration\Utils\TaxonomyDataProcessor::filterValidQueueNames([
+      'dkan_metastore_import',
+      'dkan_metastore_storage'
+    ]);
+
+    foreach ($queue_names as $queue_name) {
+      $queue = \Drupal::queue($queue_name);
+      if ($queue) {
+        $processed = 0;
+        while ($item = $queue->claimItem()) {
+          $queue->deleteItem($item);
+          $processed++;
+        }
+        if ($processed > 0) {
+          _dkan_taxonomy_integration_logger()->info('Processed @count @queue queue items for dataset "@dataset" (ID: @id)', [
+            '@count' => $processed,
+            '@queue' => $queue_name,
+            '@dataset' => $dataset->getTitle(),
+            '@id' => $dataset->id()
+          ]);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Helper function to clear caches for a dataset.
+ */
+function _dkan_taxonomy_integration_clear_dataset_caches($dataset) {
+  if (empty($dataset) || !is_object($dataset)) {
+    return;
+  }
+
+  // Clear entity cache for this specific dataset
+  \Drupal::entityTypeManager()->getStorage('node')->resetCache([$dataset->id()]);
+
+  // Clear discovery cache to ensure field definitions are fresh
+  \Drupal::service('plugin.manager.field.field_type')->clearCachedDefinitions();
+
+  // Clear menu cache to ensure API routes are fresh
+  \Drupal::service('plugin.manager.menu.link')->rebuild();
+
+  // Force comprehensive metastore cache clear if available
+  if (\Drupal::hasService('dkan.metastore.metastore_item_factory')) {
+    $cache_tags = \Drupal\dkan_taxonomy_integration\Utils\TaxonomyDataProcessor::generateDatasetCacheTags($dataset->uuid(), $dataset->id());
+    \Drupal::service('cache_tags.invalidator')->invalidateTags($cache_tags);
+  }
+
+  // Clear REST cache for immediate API updates
+  if (\Drupal::hasService('cache.rest')) {
+    \Drupal::service('cache.rest')->invalidateAll();
+  }
+}
+
+/**
+ * Helper function to force immediate dataset update processing.
+ */
+function _dkan_taxonomy_integration_force_immediate_update($dataset) {
+  if (empty($dataset) || !is_object($dataset)) {
+    return;
+  }
+
+  try {
+    _dkan_taxonomy_integration_clear_dataset_caches($dataset);
+    _dkan_taxonomy_integration_process_queues($dataset);
+
+    _dkan_taxonomy_integration_logger()->info('Forced comprehensive immediate update for dataset "@dataset" (ID: @id)', [
+      '@dataset' => $dataset->getTitle(),
+      '@id' => $dataset->id()
+    ]);
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error forcing immediate update for dataset "@dataset" (ID: @id): @message', [
+      '@dataset' => $dataset->getTitle(),
+      '@id' => $dataset->id(),
+      '@message' => $e->getMessage()
+    ]);
+  }
+}
+
+/**
+ * Helper function to force UI-specific immediate updates.
+ */
+function _dkan_taxonomy_integration_force_ui_immediate_update($dataset) {
+  if (empty($dataset) || !is_object($dataset)) {
+    return;
+  }
+
+  try {
+    _dkan_taxonomy_integration_process_queues($dataset);
+    _dkan_taxonomy_integration_clear_dataset_caches($dataset);
+
+    _dkan_taxonomy_integration_logger()->info('Forced comprehensive UI immediate update for dataset "@dataset" (ID: @id)', [
+      '@dataset' => $dataset->getTitle(),
+      '@id' => $dataset->id()
+    ]);
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error forcing UI immediate update for dataset "@dataset" (ID: @id): @message', [
+      '@dataset' => $dataset->getTitle(),
+      '@id' => $dataset->id(),
+      '@message' => $e->getMessage()
+    ]);
+  }
+}
+
+/**
+ * Helper function to clean up metadata from all datasets when a taxonomy vocabulary is deleted.
+ */
+function _dkan_taxonomy_integration_cleanup_metadata_from_datasets($vocabulary_id) {
+  if (empty($vocabulary_id) || !is_string($vocabulary_id)) {
+    return;
+  }
+
+  try {
+    $api_field_name = $vocabulary_id; // Remove 'field_' prefix
+
+    // Check if the metastore service is available
+    if (!\Drupal::hasService('dkan.metastore.metastore_item_factory')) {
+      _dkan_taxonomy_integration_logger()->warning('DKAN metastore service not available for metadata cleanup.');
+      return;
+    }
+
+    $metadata_field = \Drupal::service('dkan.metastore.metastore_item_factory')::getMetadataField();
+    if (empty($metadata_field) || !is_string($metadata_field)) {
+      _dkan_taxonomy_integration_logger()->warning('Metadata field name is empty or invalid.');
+      return;
+    }
+
+    // Get all dataset nodes
+    $entity_type_manager = \Drupal::entityTypeManager();
+    $nodes = $entity_type_manager->getStorage('node')->loadByProperties(['type' => 'data']);
+
+    if (empty($nodes) || !is_array($nodes)) {
+      return;
+    }
+
+    $cleaned_count = 0;
+    $cleaned_datasets = [];
+
+    foreach ($nodes as $node) {
+      if (empty($node) || !is_object($node)) {
+        continue;
+      }
+
+      try {
+        if ($node->hasField($metadata_field)) {
+          $json_value = $node->get($metadata_field)->value;
+          if (!empty($json_value) && is_string($json_value)) {
+            $metadata = json_decode($json_value, TRUE);
+            if (!empty($metadata) && is_array($metadata) && isset($metadata[$api_field_name])) {
+              // Remove the field from metadata
+              unset($metadata[$api_field_name]);
+              $encoded_metadata = json_encode($metadata);
+              if ($encoded_metadata !== FALSE) {
+                $node->set($metadata_field, $encoded_metadata);
+                $node->save();
+                $cleaned_count++;
+                $cleaned_datasets[] = $node->getTitle();
+
+                _dkan_taxonomy_integration_logger()->info('Removed @field from metadata for dataset "@dataset" (ID: @id) due to vocabulary deletion', [
+                  '@field' => $api_field_name,
+                  '@dataset' => $node->getTitle(),
+                  '@id' => $node->id()
+                ]);
+
+                // Force immediate cache clearing and queue processing for this dataset
+                _dkan_taxonomy_integration_force_immediate_update($node);
+                _dkan_taxonomy_integration_force_ui_immediate_update($node);
+              }
+            }
+          }
+        }
+      } catch (\Exception $e) {
+        _dkan_taxonomy_integration_logger()->error('Error cleaning metadata for node @id: @message', [
+          '@id' => $node->id(),
+          '@message' => $e->getMessage()
+        ]);
+      }
+    }
+
+    if ($cleaned_count > 0) {
+      _dkan_taxonomy_integration_logger()->info('Cleaned up metadata from @count datasets for vocabulary "@vocabulary": @datasets', [
+        '@count' => $cleaned_count,
+        '@vocabulary' => $vocabulary_id,
+        '@datasets' => implode(', ', $cleaned_datasets)
+      ]);
+    } else {
+      _dkan_taxonomy_integration_logger()->info('No datasets found with metadata for vocabulary "@vocabulary"', [
+        '@vocabulary' => $vocabulary_id
+      ]);
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error cleaning up metadata for vocabulary "@vocabulary": @message', [
+      '@vocabulary' => $vocabulary_id,
+      '@message' => $e->getMessage()
+    ]);
+  }
+}
+
+/**
+ * Helper function to automatically create/update taxonomy_term schema item.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $term
+ *   The taxonomy term entity.
+ */
+function _dkan_taxonomy_integration_create_taxonomy_term_schema_item(\Drupal\Core\Entity\EntityInterface $term) {
+  if (empty($term) || !is_object($term) || $term->getEntityTypeId() !== 'taxonomy_term') {
+    return;
+  }
+
+  try {
+    // Get vocabulary ID.
+    $vocabulary_id = $term->bundle();
+    if (empty($vocabulary_id)) {
+      return;
+    }
+
+    // Check if this vocabulary is used in any custom taxonomy fields.
+    $custom_fields = _dkan_taxonomy_integration_get_custom_taxonomy_fields();
+    if (!\Drupal\dkan_taxonomy_integration\Utils\TaxonomyDataProcessor::isVocabularyRelevant($custom_fields, $vocabulary_id)) {
+      return;
+    }
+
+    // Check if metastore service is available.
+    if (!\Drupal::hasService('dkan.metastore.service')) {
+      _dkan_taxonomy_integration_logger()->warning('Metastore service not available for automatic taxonomy term schema creation.');
+      return;
+    }
+
+    $metastore_service = \Drupal::service('dkan.metastore.service');
+    $term_uuid = $term->uuid();
+    $term_name = $term->getName();
+
+    if (empty($term_uuid) || empty($term_name)) {
+      return;
+    }
+
+    // Prepare the taxonomy term data for the schema.
+    $taxonomy_term_data = \Drupal\dkan_taxonomy_integration\Utils\TaxonomyDataProcessor::createTaxonomyTermSchemaData($term_uuid, $term_name, $vocabulary_id);
+
+    // Check if this taxonomy term already exists in the metastore.
+    try {
+      $existing_term = $metastore_service->get('taxonomy_term', $term_uuid);
+
+      // If it exists, update it if the data has changed.
+      $existing_data = $existing_term->get('$');
+      if ($existing_data['data'] !== $term_name || $existing_data['taxonomy_vocabulary'] !== $vocabulary_id) {
+        $valid_data = $metastore_service->getValidMetadataFactory()->get(json_encode($taxonomy_term_data), 'taxonomy_term');
+        $metastore_service->put('taxonomy_term', $term_uuid, $valid_data);
+
+        _dkan_taxonomy_integration_logger()->info('Updated taxonomy_term schema item for "@term" (UUID: @uuid)', [
+          '@term' => $term_name,
+          '@uuid' => $term_uuid,
+        ]);
+      }
+    } catch (\Exception $e) {
+      // Term doesn't exist, create it.
+      $valid_data = $metastore_service->getValidMetadataFactory()->get(json_encode($taxonomy_term_data), 'taxonomy_term');
+      $metastore_service->post('taxonomy_term', $valid_data);
+
+      _dkan_taxonomy_integration_logger()->info('Created taxonomy_term schema item for "@term" (UUID: @uuid)', [
+        '@term' => $term_name,
+        '@uuid' => $term_uuid,
+      ]);
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error creating taxonomy_term schema item for "@term": @message', [
+      '@term' => $term->getName(),
+      '@message' => $e->getMessage(),
+    ]);
+  }
+}
+
+/**
+ * Helper function to automatically delete taxonomy_term schema item.
+ *
+ * @param \Drupal\Core\Entity\EntityInterface $term
+ *   The taxonomy term entity being deleted.
+ */
+function _dkan_taxonomy_integration_delete_taxonomy_term_schema_item(\Drupal\Core\Entity\EntityInterface $term) {
+  if (empty($term) || !is_object($term) || $term->getEntityTypeId() !== 'taxonomy_term') {
+    return;
+  }
+
+  try {
+    // Get vocabulary ID.
+    $vocabulary_id = $term->bundle();
+    if (empty($vocabulary_id)) {
+      return;
+    }
+
+    // Check if this vocabulary is used in any custom taxonomy fields.
+    $custom_fields = _dkan_taxonomy_integration_get_custom_taxonomy_fields();
+    $is_relevant_vocabulary = FALSE;
+
+    foreach ($custom_fields as $field_name => $field_info) {
+      if (!empty($field_info['vocabulary_id']) && $field_info['vocabulary_id'] === $vocabulary_id) {
+        $is_relevant_vocabulary = TRUE;
+        break;
+      }
+    }
+
+    // Only delete schema items for vocabularies that are used in custom taxonomy fields.
+    if (!$is_relevant_vocabulary) {
+      return;
+    }
+
+    // Check if metastore service is available.
+    if (!\Drupal::hasService('dkan.metastore.service')) {
+      _dkan_taxonomy_integration_logger()->warning('Metastore service not available for automatic taxonomy term schema deletion.');
+      return;
+    }
+
+    $metastore_service = \Drupal::service('dkan.metastore.service');
+    $term_uuid = $term->uuid();
+    $term_name = $term->getName();
+
+    if (empty($term_uuid)) {
+      return;
+    }
+
+    // Try to delete the taxonomy term schema item.
+    try {
+      $metastore_service->delete('taxonomy_term', $term_uuid);
+
+      _dkan_taxonomy_integration_logger()->info('Deleted taxonomy_term schema item for "@term" (UUID: @uuid)', [
+        '@term' => $term_name,
+        '@uuid' => $term_uuid,
+      ]);
+    } catch (\Exception $e) {
+      // Schema item might not exist, which is fine
+      _dkan_taxonomy_integration_logger()->info('Taxonomy term schema item for "@term" (UUID: @uuid) was not found in metastore (may have already been deleted)', [
+        '@term' => $term_name,
+        '@uuid' => $term_uuid,
+      ]);
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error deleting taxonomy_term schema item for "@term": @message', [
+      '@term' => $term->getName(),
+      '@message' => $e->getMessage(),
+    ]);
+  }
+}
+
+/**
+ * Helper function to clean up all taxonomy_term schema items from a deleted vocabulary.
+ *
+ * @param string $vocabulary_id
+ *   The machine name of the deleted vocabulary.
+ */
+function _dkan_taxonomy_integration_cleanup_vocabulary_schema_items($vocabulary_id) {
+  if (empty($vocabulary_id) || !is_string($vocabulary_id)) {
+    return;
+  }
+
+  try {
+    // Check if metastore service is available.
+    if (!\Drupal::hasService('dkan.metastore.service')) {
+      _dkan_taxonomy_integration_logger()->warning('Metastore service not available for vocabulary schema cleanup.');
+      return;
+    }
+
+    $metastore_service = \Drupal::service('dkan.metastore.service');
+
+    // Get all taxonomy_term schema items
+    $all_taxonomy_term = $metastore_service->getAll('taxonomy_term');
+
+    if (empty($all_taxonomy_term) || !is_array($all_taxonomy_term)) {
+      _dkan_taxonomy_integration_logger()->info('No taxonomy_term schema items found for vocabulary cleanup.');
+      return;
+    }
+
+    $deleted_count = 0;
+    $deleted_terms = [];
+
+    // Filter and delete items that belong to the deleted vocabulary
+    foreach ($all_taxonomy_term as $taxonomy_term_item) {
+      try {
+        if (empty($taxonomy_term_item) || !is_object($taxonomy_term_item)) {
+          continue;
+        }
+
+        $data = $taxonomy_term_item->get('$');
+        if (!is_array($data) || !isset($data['taxonomy_vocabulary'], $data['identifier'], $data['data'])) {
+          continue;
+        }
+
+        // Check if this item belongs to the deleted vocabulary
+        if ($data['taxonomy_vocabulary'] === $vocabulary_id) {
+          $term_identifier = $data['identifier'];
+          $term_name = $data['data'];
+
+          // Delete this taxonomy_term schema item
+          try {
+            $metastore_service->delete('taxonomy_term', $term_identifier);
+            $deleted_count++;
+            $deleted_terms[] = $term_name;
+
+            _dkan_taxonomy_integration_logger()->info('Deleted taxonomy_term schema item for "@term" (UUID: @uuid) from deleted vocabulary "@vocab"', [
+              '@term' => $term_name,
+              '@uuid' => $term_identifier,
+              '@vocab' => $vocabulary_id,
+            ]);
+          } catch (\Exception $e) {
+            _dkan_taxonomy_integration_logger()->warning('Failed to delete taxonomy_term schema item for "@term" (UUID: @uuid): @message', [
+              '@term' => $term_name,
+              '@uuid' => $term_identifier,
+              '@message' => $e->getMessage(),
+            ]);
+          }
+        }
+      } catch (\Exception $e) {
+        _dkan_taxonomy_integration_logger()->error('Error processing taxonomy_term schema item during vocabulary cleanup: @message', [
+          '@message' => $e->getMessage(),
+        ]);
+      }
+    }
+
+    if ($deleted_count > 0) {
+      _dkan_taxonomy_integration_logger()->info('Cleaned up @count taxonomy_term schema items from deleted vocabulary "@vocabulary": @terms', [
+        '@count' => $deleted_count,
+        '@vocabulary' => $vocabulary_id,
+        '@terms' => implode(', ', $deleted_terms),
+      ]);
+    } else {
+      _dkan_taxonomy_integration_logger()->info('No taxonomy_term schema items found for deleted vocabulary "@vocabulary"', [
+        '@vocabulary' => $vocabulary_id,
+      ]);
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error cleaning up taxonomy_term schema items for deleted vocabulary "@vocabulary": @message', [
+      '@vocabulary' => $vocabulary_id,
+      '@message' => $e->getMessage(),
+    ]);
+  }
+}
+
+/**
+ * Helper function to remove the field from dataset node type when vocabulary is deleted.
+ *
+ * @param string $vocabulary_id
+ *   The machine name of the deleted vocabulary.
+ */
+function _dkan_taxonomy_integration_remove_field_from_dataset($vocabulary_id) {
+  if (empty($vocabulary_id) || !is_string($vocabulary_id)) {
+    return;
+  }
+
+  try {
+    // Generate field name from vocabulary ID
+    $field_name = 'field_' . $vocabulary_id;
+
+    // Check if field exists on dataset node type
+    $existing_field = \Drupal\field\Entity\FieldConfig::loadByName('node', 'data', $field_name);
+
+    if (!empty($existing_field) && is_object($existing_field)) {
+      // Remove field instance
+      try {
+        $existing_field->delete();
+        _dkan_taxonomy_integration_logger()->info('Removed field "@field" from dataset node type', [
+          '@field' => $field_name,
+        ]);
+      } catch (\Exception $e) {
+        _dkan_taxonomy_integration_logger()->error('Failed to remove field "@field" from dataset node type: @message', [
+          '@field' => $field_name,
+          '@message' => $e->getMessage(),
+        ]);
+        return;
+      }
+
+      // Check if field storage is used by other bundles
+      try {
+        $field_storage = \Drupal\field\Entity\FieldStorageConfig::loadByName('node', $field_name);
+        if (!empty($field_storage) && is_object($field_storage)) {
+          $field_instances = \Drupal\field\Entity\FieldConfig::loadMultipleByProperties([
+            'field_name' => $field_name,
+            'entity_type' => 'node',
+          ]);
+
+          if (empty($field_instances) || !is_array($field_instances)) {
+            // No other instances exist, remove field storage
+            try {
+              $field_storage->delete();
+              _dkan_taxonomy_integration_logger()->info('Removed field storage "@field"', [
+                '@field' => $field_name,
+              ]);
+            } catch (\Exception $e) {
+              _dkan_taxonomy_integration_logger()->warning('Failed to remove field storage "@field": @message', [
+                '@field' => $field_name,
+                '@message' => $e->getMessage(),
+              ]);
+            }
+          }
+        }
+      } catch (\Exception $e) {
+        _dkan_taxonomy_integration_logger()->warning('Error checking field storage for "@field": @message', [
+          '@field' => $field_name,
+          '@message' => $e->getMessage(),
+        ]);
+      }
+
+      // Clear caches
+      try {
+        \Drupal::service('entity_type.manager')->clearCachedDefinitions();
+        \Drupal::service('plugin.manager.field.field_type')->clearCachedDefinitions();
+        _dkan_taxonomy_integration_logger()->info('Cleared field caches after removing "@field"', [
+          '@field' => $field_name,
+        ]);
+      } catch (\Exception $e) {
+        _dkan_taxonomy_integration_logger()->warning('Failed to clear caches after removing field "@field": @message', [
+          '@field' => $field_name,
+          '@message' => $e->getMessage(),
+        ]);
+      }
+
+    } else {
+      _dkan_taxonomy_integration_logger()->info('Field "@field" does not exist on dataset node type (already removed or never existed)', [
+        '@field' => $field_name,
+      ]);
+    }
+
+  } catch (\Exception $e) {
+    _dkan_taxonomy_integration_logger()->error('Error removing field for deleted vocabulary "@vocabulary": @message', [
+      '@vocabulary' => $vocabulary_id,
+      '@message' => $e->getMessage(),
+    ]);
+  }
+}

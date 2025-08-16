@@ -1,0 +1,9 @@
+name: 'DKAN Taxonomy Integration'
+description: 'Adds taxonomy vocabulary support to DKAN datasets'
+type: module
+core_version_requirement: ^9 || ^10
+package: 'DKAN'
+dependencies:
+  - dkan:metastore
+  - taxonomy
+service_provider: Drupal\dkan_taxonomy_integration\DkanTaxonomyIntegrationServiceProvider

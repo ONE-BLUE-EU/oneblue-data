@@ -1,0 +1,18 @@
+{
+    "identifier": {
+        "ui:options": {
+            "widget": "hidden"
+        }
+    },
+    "data": {
+        "ui:options": {
+            "title": "Term"
+        }
+    },
+    "taxonomy_vocabulary": {
+        "ui:options": {
+            "title": "Vocabulary",
+            "widget": "textfield"
+        }
+    }
+}

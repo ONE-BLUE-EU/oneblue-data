@@ -1,0 +1,6 @@
+services:
+  dkan_taxonomy_integration.commands:
+    class: \Drupal\dkan_taxonomy_integration\Commands\DkanTaxonomyCommands
+    arguments: ['@entity_type.manager', '@messenger']
+    tags:
+      - { name: drush.command }

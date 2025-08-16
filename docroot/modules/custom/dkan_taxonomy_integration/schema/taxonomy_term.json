@@ -1,0 +1,29 @@
+{
+    "title": "Taxonomy Terms",
+    "description": "Taxonomy terms from all vocabularies associated with datasets, providing structured categorization and tagging capabilities.",
+    "type": "object",
+    "required": [
+        "identifier",
+        "data",
+        "taxonomy_vocabulary"
+    ],
+    "properties": {
+        "identifier": {
+            "title": "Identifier",
+            "type": "string",
+            "description": "Unique identifier for the taxonomy term."
+        },
+        "data": {
+            "type": "string",
+            "title": "Term Name",
+            "description": "The human-readable name of the taxonomy term.",
+            "minLength": 1
+        },
+        "taxonomy_vocabulary": {
+            "type": "string",
+            "title": "Vocabulary",
+            "description": "The machine name of the taxonomy vocabulary this term belongs to.",
+            "minLength": 1
+        }
+    }
+}

@@ -1,0 +1,9 @@
+services:
+  dkan_taxonomy_integration.taxonomy_unification_subscriber:
+    class: Drupal\dkan_taxonomy_integration\EventSubscriber\TaxonomyUnificationSubscriber
+    arguments: ['@entity_type.manager', '@dkan.metastore.service']
+    tags:
+      - { name: event_subscriber }
+
+  # Note: Schema retriever override is now handled by the service provider
+  # in DkanTaxonomyIntegrationServiceProvider to avoid container locking issues
