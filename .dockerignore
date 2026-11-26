@@ -1,0 +1,24 @@
+# Everything Composer installs is rebuilt from composer.lock inside the image.
+.git
+.idea
+.env
+vendor
+docroot/core
+docroot/modules/contrib
+docroot/themes/contrib
+docroot/profiles/contrib
+docroot/libraries
+drush/Commands/contrib
+
+# Runtime data.
+docroot/sites/*/files
+docroot/sites/*/settings.local.php
+private
+backups
+dist
+.release-test
+*.sql
+*.sql.gz
+
+# Frontend is fetched from its own repo in the Dockerfile.
+docroot/frontend

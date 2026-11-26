@@ -1,13 +1,28 @@
 *.sql
 *.sql.gz
-composer.lock
 /vendor/
 
-# Ignore configuration files that may contain sensitive information.
-docroot/sites/*/settings*.php
-docroot/sites/*/services*.yml
+# Local environment (secrets). Copy .env.example to .env.
+/.env
 
-# Ignore paths that contain user-generated content.
+# settings.php is env-driven and committed; local overrides stay out.
+docroot/sites/*/settings.local.php
+docroot/sites/*/services.yml
+
+# User-generated content.
 docroot/sites/*/files
 docroot/sites/*/private
-docroot/frontend
+/private/
+/backups/
+
+# Release artifacts and the local release test install (release.sh).
+/dist/
+/.release-test/
+
+# Frontend lives in its own repo (ONE-BLUE-EU/one-blue-frontend).
+# In dev, ./run.sh dev clones it here.
+docroot/frontend/
+
+# PHPUnit byproducts (./run.sh exec vendor/bin/phpunit ...).
+.phpunit.result.cache
+docroot/sites/simpletest/

@@ -10,8 +10,34 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Environment: the project's Docker dev stack (./run.sh), not DDEV.
+# Scripts run from the project root (relative docroot/... paths), wherever they
+# are started from.
+PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../../../.." && pwd)"
+RUN_SH="$PROJECT_ROOT/run.sh"
+cd "$PROJECT_ROOT" || exit 1
+
+# drush in the dev web container. Its stdout is clean (PHP warnings go to
+# stderr), so $(drush php:eval ...) captures only what the code echoes.
+drush() { "$RUN_SH" dev drush "$@"; }
+
+# Run a command in the dev web container as www-data, from /var/www/html.
+web_exec() { "$RUN_SH" dev exec "$@"; }
+
+# PHPUnit's deprecation helper (Symfony bridge): fail on deprecations in this
+# module's code (self) and its direct calls, not on ones raised inside vendor
+# libraries (indirect), e.g. drush's robo under PHP 8.4.
+PHPUNIT_DEPRECATIONS='max[self]=0&max[direct]=0'
+
+# Site URL. Override with BASE_URL=...; defaults to the dev stack's published port.
+if [ -z "${BASE_URL:-}" ]; then
+    _port="$("$RUN_SH" dev compose port web 80 2>/dev/null | cut -d: -f2)"
+    BASE_URL="http://localhost:${_port:-8080}"
+    unset _port
+fi
+
 # Common configuration
-API_BASE="https://dkan.ddev.site/api/1/metastore/schemas/dataset/items"
+API_BASE="$BASE_URL/api/1/metastore/schemas/dataset/items"
 
 # Function to print colored output
 print_info() {
@@ -35,7 +61,7 @@ get_valid_dataset() {
     print_info "Retrieving first valid dataset with proper metadata..."
 
     # Get node ID
-    local node_id=$(ddev drush php:eval "
+    local node_id=$(drush php:eval "
     \$nodes = Drupal::entityTypeManager()->getStorage('node')->loadByProperties(['type' => 'data']);
     foreach (\$nodes as \$node) {
         if (\$node->hasField('field_json_metadata')) {
@@ -55,7 +81,7 @@ get_valid_dataset() {
     fi
 
     # Get dataset UUID
-    local dataset_id=$(ddev drush php:eval "
+    local dataset_id=$(drush php:eval "
     \$node = Drupal::entityTypeManager()->getStorage('node')->load($node_id);
     if (\$node) {
         echo \$node->uuid();
@@ -82,9 +108,9 @@ get_valid_dataset() {
 check_prerequisites() {
     print_info "Checking prerequisites..."
 
-    # Check if ddev is available
-    if ! command -v ddev &> /dev/null; then
-        print_error "ddev is not installed or not in PATH"
+    # Check that docker and the project's run.sh are available
+    if ! command -v docker &> /dev/null || [ ! -x "$RUN_SH" ]; then
+        print_error "docker or $RUN_SH not found"
         return 1
     fi
 
@@ -94,9 +120,9 @@ check_prerequisites() {
         return 1
     fi
 
-    # Check if DDEV is running
-    if ! ddev status &> /dev/null; then
-        print_error "DDEV is not running"
+    # Check that the dev stack is running
+    if [ -z "$("$RUN_SH" dev compose ps -q --status running web 2>/dev/null)" ]; then
+        print_error "The dev stack is not running (start it with ./run.sh)"
         return 1
     fi
 
@@ -107,7 +133,7 @@ check_prerequisites() {
 # Function to clear cache and wait
 clear_cache_and_wait() {
     print_info "Clearing cache and waiting for processing..."
-    ddev drush cr
+    drush cr
     sleep 2
 }
 
@@ -115,7 +141,7 @@ clear_cache_and_wait() {
 get_term_ids() {
     local vocabulary_id="$1"
 
-    local term_ids=$(ddev drush php:eval "
+    local term_ids=$(drush php:eval "
     \$terms = Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties(['vid' => '$vocabulary_id']);
     \$ids = [];
     foreach (\$terms as \$term) {
@@ -134,7 +160,7 @@ assign_terms_to_dataset() {
 
     print_info "Assigning terms to dataset..."
 
-    ddev drush php:eval "
+    drush php:eval "
     \$node = Drupal::entityTypeManager()->getStorage('node')->load($NODE_ID);
     \$term_ids = explode(',', '$term_ids');
     \$node->set('field_$vocabulary_id', \$term_ids);
@@ -186,9 +212,9 @@ check_logs() {
     local count="${2:-5}"
 
     print_info "Checking logs for: $search_term"
-    if ddev drush watchdog:show --type=dkan_taxonomy_integration --count="$count" | grep "$search_term" > /dev/null; then
+    if drush watchdog:show --type=dkan_taxonomy_integration --count="$count" | grep "$search_term" > /dev/null; then
         print_success "Found log entries for: $search_term"
-        ddev drush watchdog:show --type=dkan_taxonomy_integration --count="$count" | grep "$search_term"
+        drush watchdog:show --type=dkan_taxonomy_integration --count="$count" | grep "$search_term"
     else
         print_info "Note: No recent log entries found for '$search_term' (this may be expected if no datasets use the updated terms)"
     fi
@@ -202,10 +228,10 @@ cleanup_vocabulary() {
     print_info "Cleaning up vocabulary: $vocabulary_id"
 
     if [ "$delete_vocabulary" = "true" ]; then
-        ddev drush dkan:remove-taxonomy-from-dataset "$vocabulary_id" --delete-vocabulary
+        drush dkan:remove-taxonomy-from-dataset "$vocabulary_id" --delete-vocabulary
         print_success "Vocabulary $vocabulary_id completely removed"
     else
-        ddev drush dkan:remove-taxonomy-from-dataset "$vocabulary_id"
+        drush dkan:remove-taxonomy-from-dataset "$vocabulary_id"
         print_success "Vocabulary $vocabulary_id field removed (vocabulary kept)"
     fi
 }
@@ -217,30 +243,30 @@ create_vocabulary_and_terms() {
     local description="${3:-Test vocabulary}"
 
     print_info "Creating vocabulary: $vocabulary_id"
-    ddev drush dkan:add-taxonomy-to-dataset "$vocabulary_id" --description="$description"
+    drush dkan:add-taxonomy-to-dataset "$vocabulary_id" --description="$description"
 
     if [ -n "$terms" ]; then
         print_info "Adding terms: $terms"
-        ddev drush dkan:add-taxonomy-terms "$vocabulary_id" "$terms"
+        drush dkan:add-taxonomy-terms "$vocabulary_id" "$terms"
     fi
 }
 
 # Function to test field detection
 test_field_detection() {
     print_info "Testing field detection..."
-    ddev drush dkan:test-taxonomy-fields
+    drush dkan:test-taxonomy-fields
 }
 
 # Function to show initial state
 show_initial_state() {
     print_info "Checking initial state..."
-    ddev drush dkan:list-taxonomy-vocabularies
+    drush dkan:list-taxonomy-vocabularies
 }
 
 # Function to show final state
 show_final_state() {
     print_info "Final vocabulary list:"
-    ddev drush dkan:list-taxonomy-vocabularies
+    drush dkan:list-taxonomy-vocabularies
 }
 
 # Export functions so they can be used by sourcing scripts

@@ -1,0 +1,61 @@
+# Production: code is baked into the image. Uploaded files live in the project
+# directory on the server (same paths as dev), so they can be rsynced:
+#   /opt/oneblue-data/docroot/sites/default/files  <->  ./docroot/sites/default/files
+# The database stays in a Docker volume.
+#
+# Front proxy, chosen by PROXY at first deploy (stored in .env):
+#   PROXY=nginx  The host's nginx (shared with other sites) terminates HTTPS and
+#                proxies to the web container, published on 127.0.0.1:WEB_PORT only.
+#                Caddy is not started.
+#   PROXY=caddy  Caddy (COMPOSE_PROFILES=caddy) owns ports 80/443 and gets its own
+#                Let's Encrypt certificate. For a server that hosts nothing else.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: prod
+      args:
+        PHP_IMAGE: ${PHP_IMAGE:?load .env.images}
+        NODE_IMAGE: ${NODE_IMAGE:?load .env.images}
+        COMPOSER_IMAGE: ${COMPOSER_IMAGE:?load .env.images}
+        PHP_EXT_INSTALLER_IMAGE: ${PHP_EXT_INSTALLER_IMAGE:?load .env.images}
+        FRONTEND_REPO: ${FRONTEND_REPO:?load .env.images}
+        FRONTEND_REF: ${FRONTEND_REF:?load .env.images}
+    image: ${APP_IMAGE_PROD:?load .env.images}
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8090}:80"
+    volumes:
+      - ./docroot/sites/default/files:/var/www/html/docroot/sites/default/files
+      - ./private:/var/www/html/private
+
+  cron:
+    image: ${APP_IMAGE_PROD:?load .env.images}
+    volumes:
+      - ./docroot/sites/default/files:/var/www/html/docroot/sites/default/files
+      - ./private:/var/www/html/private
+    depends_on:
+      web:
+        condition: service_started
+
+  caddy:
+    profiles: [caddy]
+    image: ${CADDY_IMAGE:?load .env.images}
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  caddy-data:
+  caddy-config:

@@ -70,7 +70,7 @@ echo
 
 # Step 8: Trigger save again
 print_info "Step 8: Triggering dataset save (cleanup)..."
-ddev drush php:eval "Drupal::entityTypeManager()->getStorage('node')->load($NODE_ID)->save();"
+drush php:eval "Drupal::entityTypeManager()->getStorage('node')->load($NODE_ID)->save();"
 echo
 
 # Step 9: Check API (after removing)

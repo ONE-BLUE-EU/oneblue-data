@@ -1,0 +1,10 @@
+[mysqld]
+# DKAN's datastore importer uses LOAD DATA LOCAL INFILE.
+local_infile = ON
+max_allowed_packet = 256M
+innodb_buffer_pool_size = 512M
+character-set-server = utf8mb4
+collation-server = utf8mb4_general_ci
+
+[mysql]
+local-infile = 1

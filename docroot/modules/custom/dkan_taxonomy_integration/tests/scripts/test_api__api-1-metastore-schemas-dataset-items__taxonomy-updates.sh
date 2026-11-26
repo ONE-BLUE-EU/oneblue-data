@@ -54,7 +54,7 @@ echo
 # Step 4: Test programmatic term update
 print_info "Step 4: Testing programmatic term update..."
 TERM_ID=$(echo $TERM_IDS | cut -d',' -f1)
-ddev drush php:eval "
+drush php:eval "
 \$term = Drupal::entityTypeManager()->getStorage('taxonomy_term')->load($TERM_ID);
 if (\$term) {
     \$old_name = \$term->getName();
@@ -80,7 +80,7 @@ echo
 
 # Step 7: Test UI-based term update simulation
 print_info "Step 7: Testing UI-based term update simulation..."
-ddev drush php:eval "
+drush php:eval "
 \$term = Drupal::entityTypeManager()->getStorage('taxonomy_term')->load($TERM_ID);
 if (\$term) {
     \$old_name = \$term->getName();
@@ -106,7 +106,7 @@ echo
 
 # Step 10: Test multiple terms scenario
 print_info "Step 10: Testing multiple terms scenario..."
-ddev drush dkan:add-taxonomy-terms "$VOCABULARY_ID" "SecondTerm,ThirdTerm"
+drush dkan:add-taxonomy-terms "$VOCABULARY_ID" "SecondTerm,ThirdTerm"
 echo
 
 # Get all term IDs and assign to dataset
@@ -122,7 +122,7 @@ SECOND_TERM_ID=$(echo $ALL_TERM_IDS | cut -d',' -f2)
 THIRD_TERM_ID=$(echo $ALL_TERM_IDS | cut -d',' -f3)
 
 # Update second term
-ddev drush php:eval "
+drush php:eval "
 \$term = Drupal::entityTypeManager()->getStorage('taxonomy_term')->load($SECOND_TERM_ID);
 if (\$term) {
     \$old_name = \$term->getName();
@@ -135,7 +135,7 @@ if (\$term) {
 "
 
 # Update third term (form-based simulation)
-ddev drush php:eval "
+drush php:eval "
 \$term = Drupal::entityTypeManager()->getStorage('taxonomy_term')->load($THIRD_TERM_ID);
 if (\$term) {
     \$old_name = \$term->getName();
@@ -156,7 +156,7 @@ echo
 
 # Step 13: Verify all term updates
 print_info "Step 13: Verifying all term updates..."
-ddev drush php:eval "
+drush php:eval "
 \$terms = [$TERM_ID, $SECOND_TERM_ID, $THIRD_TERM_ID];
 foreach (\$terms as \$term_id) {
     \$term = Drupal::entityTypeManager()->getStorage('taxonomy_term')->load(\$term_id);

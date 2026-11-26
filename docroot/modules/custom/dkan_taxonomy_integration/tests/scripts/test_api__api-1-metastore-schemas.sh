@@ -15,7 +15,7 @@ echo "🧪 Testing API Schema Integration & DKAN Limitations"
 echo "================================================"
 
 # Configuration
-API_URL="https://dkan.ddev.site/api/1/metastore/schemas"
+API_URL="$BASE_URL/api/1/metastore/schemas"
 MODULE_SCHEMA_DIR="docroot/modules/custom/dkan_taxonomy_integration/schema"
 
 # Step 1: Get baseline API response
@@ -98,7 +98,7 @@ done
 print_info "Step 5: Testing direct metastore service functionality"
 
 # Test that our module can use the metastore service for taxonomy_term operations
-METASTORE_TEST=$(ddev drush eval "
+METASTORE_TEST=$(drush eval "
 try {
     \$service = \Drupal::service('dkan.metastore.service');
 
@@ -128,7 +128,7 @@ fi
 print_info "Step 6: Testing module's taxonomy integration functionality"
 
 # Verify our event subscriber is registered
-SUBSCRIBER_TEST=$(ddev drush eval "
+SUBSCRIBER_TEST=$(drush eval "
 try {
     \$subscriber = \Drupal::service('dkan_taxonomy_integration.taxonomy_unification_subscriber');
     echo 'SUCCESS: TaxonomyUnificationSubscriber service available';

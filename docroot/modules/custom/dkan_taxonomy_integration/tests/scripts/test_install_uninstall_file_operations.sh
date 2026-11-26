@@ -21,16 +21,16 @@ echo
 
 # Define paths
 MODULE_SCHEMA_DIR="docroot/modules/custom/dkan_taxonomy_integration/schema"
-API_URL="https://dkan.ddev.site/api/1/metastore/schemas"
+API_URL="$BASE_URL/api/1/metastore/schemas"
 
 # Step 1: Verify starting state (module should be disabled, files should not exist)
 print_info "Step 1: Verifying clean starting state..."
 
 # Check module status
-if ddev drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
+if drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
     print_info "Module is currently enabled - disabling for clean test..."
-    ddev drush pm:uninstall dkan_taxonomy_integration -y
-    ddev drush cr
+    drush pm:uninstall dkan_taxonomy_integration -y
+    drush cr
     sleep 2
 fi
 
@@ -104,7 +104,7 @@ echo
 print_info "Step 3: Installing module and verifying service provider activation..."
 
 print_info "Installing dkan_taxonomy_integration module..."
-if ddev drush pm:enable dkan_taxonomy_integration -y; then
+if drush pm:enable dkan_taxonomy_integration -y; then
     print_success "✅ Module installed successfully"
 else
     print_error "❌ Module installation failed"
@@ -112,7 +112,7 @@ else
 fi
 
 print_info "Clearing cache after install..."
-ddev drush cr
+drush cr
 sleep 2
 
 # Verify schema files still exist in module directory
@@ -178,7 +178,7 @@ fi
 
 # Test our module's direct functionality (metastore service usage)
 print_info "Testing module functionality directly..."
-METASTORE_TEST=$(ddev drush eval "try { \$service = \Drupal::service('dkan.metastore.service'); echo 'Metastore service available'; } catch (\Exception \$e) { echo 'Error: ' . \$e->getMessage(); }")
+METASTORE_TEST=$(drush eval "try { \$service = \Drupal::service('dkan.metastore.service'); echo 'Metastore service available'; } catch (\Exception \$e) { echo 'Error: ' . \$e->getMessage(); }")
 
 if echo "$METASTORE_TEST" | grep -q "Metastore service available"; then
     print_success "✅ Module can access DKAN metastore service"
@@ -193,7 +193,7 @@ echo
 print_info "Step 5: Uninstalling module and verifying service provider deactivation..."
 
 print_info "Uninstalling dkan_taxonomy_integration module..."
-if ddev drush pm:uninstall dkan_taxonomy_integration -y; then
+if drush pm:uninstall dkan_taxonomy_integration -y; then
     print_success "✅ Module uninstalled successfully"
 else
     print_error "❌ Module uninstall failed"
@@ -201,7 +201,7 @@ else
 fi
 
 print_info "Clearing cache after uninstall..."
-ddev drush cr
+drush cr
 sleep 2
 
 # Verify schema files still exist in module directory (they should remain)

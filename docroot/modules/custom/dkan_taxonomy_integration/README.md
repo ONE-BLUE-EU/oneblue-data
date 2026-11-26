@@ -147,7 +147,7 @@ The custom taxonomy field is now available through the DKAN API:
 ```bash
 # Get dataset with custom taxonomy field
 curl -X 'GET' \
-  'https://dkan.ddev.site/api/1/metastore/schemas/dataset/items/12345-abcde?show-reference-ids=true' \
+  'http://localhost:8080/api/1/metastore/schemas/dataset/items/12345-abcde?show-reference-ids=true' \
   -H 'accept: application/json'
 ```
 
@@ -457,15 +457,23 @@ drush sql-query "SELECT field_json_metadata_value FROM node__field_json_metadata
 
 ## 🧪 Testing
 
+Tests run against the project's Docker dev stack: start it with `./run.sh`
+from the project root (site at http://localhost:8080). The integration scripts
+use `./run.sh drush` and `./run.sh exec`; set `BASE_URL` to test another URL.
+
 ### Unit Tests
 
 ```bash
-# Run all unit tests (48 tests, 300+ assertions)
-ddev exec vendor/bin/phpunit docroot/modules/custom/dkan_taxonomy_integration/tests/src/Unit/ --bootstrap /var/www/html/docroot/core/tests/bootstrap.php --testdox
+# Run all unit tests (64 tests, 300+ assertions)
+./run.sh exec env 'SYMFONY_DEPRECATIONS_HELPER=max[self]=0&max[direct]=0' vendor/bin/phpunit docroot/modules/custom/dkan_taxonomy_integration/tests/src/Unit/ --bootstrap docroot/core/tests/bootstrap.php --testdox
 
 # Run single test file
-ddev exec vendor/bin/phpunit docroot/modules/custom/dkan_taxonomy_integration/tests/src/Unit/DkanTaxonomyIntegrationModuleTest.php --testdox
+./run.sh exec env 'SYMFONY_DEPRECATIONS_HELPER=max[self]=0&max[direct]=0' vendor/bin/phpunit docroot/modules/custom/dkan_taxonomy_integration/tests/src/Unit/DkanTaxonomyIntegrationModuleTest.php --bootstrap docroot/core/tests/bootstrap.php --testdox
 ```
+
+`SYMFONY_DEPRECATIONS_HELPER` makes PHPUnit fail on deprecations in this module's
+own code, but not on ones raised inside vendor libraries (e.g. drush's
+dependencies under PHP 8.4), which Drupal's test setup would otherwise also fail on.
 
 **Test Coverage:**
 - ✅ **TaxonomyDataProcessorTest** (31 tests) - Core utility functions
@@ -478,40 +486,41 @@ ddev exec vendor/bin/phpunit docroot/modules/custom/dkan_taxonomy_integration/te
 
 ### Integration Tests
 
+⚠️ These change the dev database (enable/uninstall the module, add and remove
+taxonomy data). Back it up first: `./run.sh db-export`.
+
 ```bash
 # Run ALL tests (Unit + Integration) in one command
 docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/run_all_tests.sh
 
-# OR run individual integration tests:
-
-# Test API metastore schemas integration (/api/1/metastore/schemas)
-docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/test_api_metastore_schemas_integration.sh
-
-# Test complete dataset workflow (/api/1/metastore/schemas/dataset/items/{id})
-docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/test_api_dataset_items_complete_workflow.sh
-
-# Test taxonomy term updates (/api/1/metastore/schemas/dataset/items/{id})
-docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/test_api_dataset_items_taxonomy_term_updates.sh
-
-# Test comprehensive API endpoints (all endpoints verification)
-docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/test_api_endpoints_comprehensive.sh
-
-# Test module uninstall cleanup behavior ⚠️ UNINSTALLS MODULE
-docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/test_api_endpoints_uninstall_cleanup.sh
+# OR run individual integration tests (from any directory):
+T=docroot/modules/custom/dkan_taxonomy_integration/tests/scripts
+$T/test_api__api-1-metastore-schemas.sh
+$T/test_api__api-1-metastore-schemas-dataset-items__workflow.sh
+$T/test_api__api-1-metastore-schemas-dataset-items__taxonomy-updates.sh
+$T/test_api__api-1-metastore-schemas__multiple-endpoints.sh
+$T/test_api__api-1-metastore-schemas__isolation.sh
+$T/test_schema_file_error_handling.sh
+$T/test_install_uninstall_file_operations.sh
+$T/test_api__api-1-metastore-schemas__stress-test.sh          # ⚠️ uninstalls/reinstalls the module repeatedly
+$T/test_api__api-1-metastore-schemas-taxonomy_term.sh
+$T/test_api__api-1-metastore-schemas-taxonomy_term-items.sh
+$T/test_api__api-1-metastore-schemas__cleanup.sh              # ⚠️ UNINSTALLS the module
 ```
 
 **Integration Test Coverage:**
-- ✅ **test_api_metastore_schemas_integration.sh** - Tests `/api/1/metastore/schemas` - Schema pattern verification and structure
-- ✅ **test_api_dataset_items_complete_workflow.sh** - Tests `/api/1/metastore/schemas/dataset/items/{id}` - Complete end-to-end workflow
-- ✅ **test_api_dataset_items_taxonomy_term_updates.sh** - Tests `/api/1/metastore/schemas/dataset/items/{id}` - Real-time term updates (programmatic + UI simulation)
-- ✅ **test_api_endpoints_comprehensive.sh** - Tests all API endpoints comprehensively - Structure validation, isolation verification, module behavior
-- ✅ **test_api_endpoint_isolation_verification.sh** - Tests critical endpoint isolation - Anti-pollution verification
-- ✅ **test_schema_file_error_handling.sh** - Tests error conditions and edge cases - File validation, permissions, corruption handling
-- ✅ **test_install_uninstall_file_operations.sh** - Tests complete file system operations - Install/uninstall cycle validation
-- ✅ **test_install_uninstall_cycle_stress_test.sh** - Tests multiple install/uninstall cycles - Robustness and performance verification
-- ✅ **test_comprehensive_schema_validation.sh** - Tests end-to-end schema behavior - Complete validation pipeline
-- ✅ **test_api_endpoints_uninstall_cleanup.sh** - Tests module uninstall behavior - Endpoint removal verification
-- ✅ **common_functions.sh** - Shared utilities for consistent integration testing
+- ✅ **test_api__api-1-metastore-schemas.sh** - `/api/1/metastore/schemas` integration through the service provider
+- ✅ **test_api__api-1-metastore-schemas-dataset-items__workflow.sh** - Complete workflow including term assignment
+- ✅ **test_api__api-1-metastore-schemas-dataset-items__taxonomy-updates.sh** - `/api/1/metastore/schemas/dataset/items/{id}` - Real-time term updates (programmatic + UI)
+- ✅ **test_api__api-1-metastore-schemas__multiple-endpoints.sh** - Taxonomy, keyword and dataset endpoints together
+- ✅ **test_api__api-1-metastore-schemas__isolation.sh** - Endpoint isolation (no keyword/items pollution)
+- ✅ **test_schema_file_error_handling.sh** - Error conditions and edge cases for schema files
+- ✅ **test_install_uninstall_file_operations.sh** - Install/uninstall cycle with service provider verification
+- ✅ **test_api__api-1-metastore-schemas__stress-test.sh** - Repeated install/uninstall cycles
+- ✅ **test_api__api-1-metastore-schemas-taxonomy_term.sh** - End-to-end `taxonomy_term` schema behavior
+- ✅ **test_api__api-1-metastore-schemas-taxonomy_term-items.sh** - `/api/1/metastore/schemas/taxonomy_term/items`
+- ✅ **test_api__api-1-metastore-schemas__cleanup.sh** - Endpoints are removed after module uninstall
+- ✅ **common_functions.sh** - Shared helpers: `drush`, `web_exec`, `BASE_URL`, output and dataset utilities
 
 **Key Features:**
 - **Live System Testing** - Tests against actual DKAN installation with real database operations
@@ -532,9 +541,9 @@ docroot/modules/custom/dkan_taxonomy_integration/tests/scripts/test_api_endpoint
 - ✅ `/api/1/metastore/schemas/dataset/items/{id}` - Dataset integration testing
 
 **Schema Definition Management:**
-- ✅ **FIXED**: The module now properly creates and removes `taxonomy_term` schema definition files during install/uninstall
-- 📁 **Schema Files**: The module provides `schema/taxonomy_term.json` and `schema/taxonomy_term.ui.json` which are copied to DKAN's schema collections directory during installation
-- 🗑️ **Clean Uninstall**: Schema definition files are properly removed during module uninstall, ensuring endpoints return 404 after removal
+- ✅ The `taxonomy_term` schema is available through the API while the module is installed and gone after uninstall
+- 📁 **Schema Files**: The module provides `schema/taxonomy_term.json` and `schema/taxonomy_term.ui.json`. They stay in the module directory and are served by the module's service provider; nothing is copied into DKAN's schema collections directory
+- 🗑️ **Clean Uninstall**: After uninstall the `taxonomy_term` schema endpoints return 404 and nothing is left behind in DKAN's directories
 
 **Important:** Integration tests require a live DKAN system and do **NOT** run automatically with PHPUnit unit tests. They are separate testing mechanisms that validate real-world module behavior.
 

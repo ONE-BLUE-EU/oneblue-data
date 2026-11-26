@@ -18,7 +18,7 @@ check_prerequisites
 print_info "Step 1: Verifying module is installed and endpoints exist..."
 
 # Check module status
-MODULE_CHECK=$(ddev drush pm:list | grep "dkan_taxonomy_integration" | grep "Enabled" || echo "")
+MODULE_CHECK=$(drush pm:list | grep "dkan_taxonomy_integration" | grep "Enabled" || echo "")
 if [ -n "$MODULE_CHECK" ]; then
     MODULE_STATUS="Enabled"
 else
@@ -32,29 +32,22 @@ else
     exit 1
 fi
 
-# Due to DKAN's hardcoded schema discovery, verify schema files exist instead of API endpoints
+# The module serves its schema through its service provider (files stay in the
+# module's schema/ directory, never copied into DKAN's schema/collections).
 DKAN_SCHEMA_DIR="docroot/modules/contrib/dkan/schema/collections"
+MODULE_SCHEMA_DIR="docroot/modules/custom/dkan_taxonomy_integration/schema"
 
-if [ -f "$DKAN_SCHEMA_DIR/taxonomy_term.json" ]; then
-    print_success "✅ taxonomy_term schema file exists before uninstall test"
+SCHEMA_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/taxonomy_term")
+if [ "$SCHEMA_HTTP_CODE" = "200" ]; then
+    print_success "✅ taxonomy_term schema endpoint accessible before uninstall (HTTP 200)"
 else
-    print_error "❌ taxonomy_term schema file not found before uninstall test"
+    print_error "❌ taxonomy_term schema endpoint not accessible before uninstall (HTTP $SCHEMA_HTTP_CODE)"
     exit 1
 fi
 
-# Note: Due to DKAN's hardcoded schema discovery, API endpoints may return 404 even when files exist
-SCHEMA_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term")
-if [ "$SCHEMA_HTTP_CODE" = "200" ]; then
-    print_success "✅ taxonomy_term schema endpoint accessible (HTTP 200) - DKAN updated!"
-elif [ "$SCHEMA_HTTP_CODE" = "404" ]; then
-    print_success "✅ schema endpoint returns 404 (expected due to DKAN limitation, but files exist)"
-else
-    print_info "⚠️  Schema endpoint returns HTTP $SCHEMA_HTTP_CODE"
-fi
-
 # Check that keyword endpoints still work (baseline check)
-KEYWORD_SCHEMA_BEFORE=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/keyword")
-KEYWORD_ITEMS_BEFORE=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/keyword/items")
+KEYWORD_SCHEMA_BEFORE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/keyword")
+KEYWORD_ITEMS_BEFORE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/keyword/items")
 
 if [ "$KEYWORD_SCHEMA_BEFORE" = "200" ]; then
     print_success "✅ keyword schema endpoint accessible before uninstall (HTTP 200)"
@@ -75,27 +68,27 @@ echo
 # Step 2: Uninstall the module
 print_info "Step 2: Uninstalling module..."
 
-ddev drush pm:uninstall dkan_taxonomy_integration -y > /dev/null 2>&1
-ddev drush cr > /dev/null 2>&1
+drush pm:uninstall dkan_taxonomy_integration -y > /dev/null 2>&1
+drush cr > /dev/null 2>&1
 
 print_success "✅ Module uninstalled successfully"
 
 echo
 
-# Step 3: Verify schema files are removed
-print_info "Step 3: Verifying schema files are removed..."
+# Step 3: Verify no schema files are left in DKAN's directory
+print_info "Step 3: Verifying no schema files are left in DKAN's schema directory..."
 
-if [ ! -f "$DKAN_SCHEMA_DIR/taxonomy_term.json" ]; then
-    print_success "✅ taxonomy_term.json removed after uninstall"
+if [ ! -f "$DKAN_SCHEMA_DIR/taxonomy_term.json" ] && [ ! -f "$DKAN_SCHEMA_DIR/taxonomy_term.ui.json" ]; then
+    print_success "✅ No taxonomy_term files in $DKAN_SCHEMA_DIR"
 else
-    print_error "❌ taxonomy_term.json still exists after uninstall"
+    print_error "❌ taxonomy_term files found in $DKAN_SCHEMA_DIR after uninstall"
     exit 1
 fi
 
-if [ ! -f "$DKAN_SCHEMA_DIR/taxonomy_term.ui.json" ]; then
-    print_success "✅ taxonomy_term.ui.json removed after uninstall"
+if [ -f "$MODULE_SCHEMA_DIR/taxonomy_term.json" ] && [ -f "$MODULE_SCHEMA_DIR/taxonomy_term.ui.json" ]; then
+    print_success "✅ Module's own schema files remain in place"
 else
-    print_error "❌ taxonomy_term.ui.json still exists after uninstall"
+    print_error "❌ Module's own schema files were removed"
     exit 1
 fi
 
@@ -105,8 +98,8 @@ echo
 print_info "Step 4: Verifying API endpoints after uninstall..."
 
 # Test taxonomy_term endpoints (should return 404 or empty)
-TAXONOMY_SCHEMA_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term")
-TAXONOMY_ITEMS_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items")
+TAXONOMY_SCHEMA_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/taxonomy_term")
+TAXONOMY_ITEMS_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items")
 
 if [ "$TAXONOMY_SCHEMA_AFTER" = "404" ] || [ "$TAXONOMY_SCHEMA_AFTER" = "500" ]; then
     print_success "✅ taxonomy_term schema endpoint properly removed (HTTP $TAXONOMY_SCHEMA_AFTER)"
@@ -119,7 +112,7 @@ if [ "$TAXONOMY_ITEMS_AFTER" = "404" ] || [ "$TAXONOMY_ITEMS_AFTER" = "500" ]; t
     print_success "✅ taxonomy_term/items endpoint properly removed (HTTP $TAXONOMY_ITEMS_AFTER)"
 elif [ "$TAXONOMY_ITEMS_AFTER" = "200" ]; then
     # Check if it's empty due to DKAN limitation
-    ITEMS_CONTENT=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items")
+    ITEMS_CONTENT=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items")
     ITEMS_COUNT=$(echo "$ITEMS_CONTENT" | jq 'length' 2>/dev/null || echo "0")
     if [ "$ITEMS_COUNT" = "0" ]; then
         print_success "✅ taxonomy_term/items endpoint returns empty array (DKAN limitation - acceptable)"
@@ -137,8 +130,8 @@ echo
 # Step 5: Verify that standard endpoints still work
 print_info "Step 5: Verifying standard endpoints still work..."
 
-KEYWORD_SCHEMA_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/keyword")
-KEYWORD_ITEMS_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/keyword/items")
+KEYWORD_SCHEMA_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/keyword")
+KEYWORD_ITEMS_AFTER=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/keyword/items")
 
 if [ "$KEYWORD_SCHEMA_AFTER" = "200" ]; then
     print_success "✅ keyword schema endpoint still works (HTTP 200)"
@@ -159,7 +152,7 @@ echo
 print_success "=== API Endpoints Module Uninstall Cleanup Test PASSED! ==="
 
 print_success "✅ SUCCESS: Module uninstalled successfully"
-print_success "✅ SUCCESS: Schema files removed completely"
+print_success "✅ SUCCESS: No schema files left in DKAN's directory"
 print_success "✅ SUCCESS: taxonomy_term endpoints properly removed"
 print_success "✅ SUCCESS: Standard endpoints unaffected"
 print_success "✅ SUCCESS: Complete cleanup verified"
@@ -167,7 +160,7 @@ print_success "✅ SUCCESS: Complete cleanup verified"
 echo
 echo "🔧 Uninstall Cleanup Summary:"
 echo "• Module uninstall: VERIFIED ✅"
-echo "• Schema file removal: VERIFIED ✅"
+echo "• No leftover schema files: VERIFIED ✅"
 echo "• Endpoint cleanup: VERIFIED ✅"
 echo "• Standard endpoints preserved: VERIFIED ✅"
 echo "• Complete cleanup: VERIFIED ✅"

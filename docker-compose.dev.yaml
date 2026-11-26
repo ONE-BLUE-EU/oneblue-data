@@ -1,0 +1,58 @@
+# Development: the project directory is bind-mounted, so code edits are live.
+# Site:    http://localhost:${HTTP_PORT:-8080}
+# Mailpit: http://localhost:${MAILPIT_PORT:-8025}
+
+x-dev-build: &dev-build
+  context: .
+  dockerfile: docker/Dockerfile
+  target: dev
+  args:
+    PHP_IMAGE: ${PHP_IMAGE:?load .env.images}
+    NODE_IMAGE: ${NODE_IMAGE:?load .env.images}
+    COMPOSER_IMAGE: ${COMPOSER_IMAGE:?load .env.images}
+    PHP_EXT_INSTALLER_IMAGE: ${PHP_EXT_INSTALLER_IMAGE:?load .env.images}
+    UID: ${HOST_UID:-1000}
+    GID: ${HOST_GID:-1000}
+
+services:
+  web:
+    build: *dev-build
+    image: ${APP_IMAGE_DEV:?load .env.images}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+    volumes:
+      - .:/var/www/html
+    environment:
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_TLS: "off"
+      SMTP_STARTTLS: "off"
+      SMTP_FROM: ${SMTP_FROM:-noreply@oneblue.local}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  cron:
+    image: ${APP_IMAGE_DEV:?load .env.images}
+    volumes:
+      - .:/var/www/html
+    environment:
+      XDEBUG_MODE: "off"
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_TLS: "off"
+      SMTP_STARTTLS: "off"
+      SMTP_FROM: ${SMTP_FROM:-noreply@oneblue.local}
+    depends_on:
+      web:
+        condition: service_started
+
+  db:
+    ports:
+      - "127.0.0.1:${DB_PORT_HOST:-3306}:3306"
+
+  mailpit:
+    image: ${MAILPIT_IMAGE:?load .env.images}
+    ports:
+      - "${MAILPIT_PORT:-8025}:8025"
+    restart: unless-stopped

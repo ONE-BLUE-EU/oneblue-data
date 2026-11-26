@@ -20,7 +20,7 @@ echo
 
 # Define paths
 MODULE_SCHEMA_DIR="docroot/modules/custom/dkan_taxonomy_integration/schema"
-API_URL="https://dkan.ddev.site/api/1/metastore/schemas"
+API_URL="$BASE_URL/api/1/metastore/schemas"
 
 # Step 1: Test with corrupted source files
 print_info "Step 1: Testing behavior with corrupted source files..."

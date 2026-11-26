@@ -29,7 +29,7 @@ DATASET_ID=""
 NODE_ID=""
 
 # Get the first dataset from API
-DATASETS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/dataset/items")
+DATASETS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/dataset/items")
 if echo "$DATASETS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
     DATASETS_COUNT=$(echo "$DATASETS_RESPONSE" | jq 'length')
     if [ "$DATASETS_COUNT" -gt 0 ]; then
@@ -37,7 +37,7 @@ if echo "$DATASETS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
 
         if [ -n "$DATASET_ID" ] && [ "$DATASET_ID" != "null" ]; then
             # Get node ID for this specific dataset
-            NODE_ID=$(ddev drush eval "
+            NODE_ID=$(drush eval "
                 \$query = \Drupal::entityQuery('node')
                     ->condition('type', 'data')
                     ->condition('field_data_type', 'dataset')
@@ -85,8 +85,8 @@ echo
 print_info "Step 1: Testing taxonomy_term schema accessibility via API..."
 
 # With service provider approach, schemas are accessible via API directly
-TAXONOMY_SCHEMA_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term")
-KEYWORD_SCHEMA_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/keyword")
+TAXONOMY_SCHEMA_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term")
+KEYWORD_SCHEMA_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/keyword")
 
 if echo "$TAXONOMY_SCHEMA_RESPONSE" | jq -e '.type' > /dev/null 2>&1; then
     print_success "✅ taxonomy_term schema accessible via API"
@@ -147,7 +147,7 @@ echo
 # Step 2: Test /api/1/metastore/schemas/keyword/items (ensure not messed up)
 print_info "Step 2: Testing /api/1/metastore/schemas/keyword/items structure..."
 
-KEYWORD_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/keyword/items")
+KEYWORD_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/keyword/items")
 
 # Check if response is an array
 if echo "$KEYWORD_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
@@ -198,7 +198,7 @@ clear_cache_and_wait
 # Step 5: Test /api/1/metastore/schemas/taxonomy_term/items accessibility (DKAN limitation)
 print_info "Step 5: Testing /api/1/metastore/schemas/taxonomy_term/items accessibility..."
 
-TAXONOMY_ITEMS_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items")
+TAXONOMY_ITEMS_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items")
 
 if [ "$TAXONOMY_ITEMS_HTTP_CODE" = "404" ]; then
     print_warning "⚠️  Unexpected: taxonomy_term/items endpoint returns 404 (SchemaRetriever patch may not be working)"
@@ -207,7 +207,7 @@ if [ "$TAXONOMY_ITEMS_HTTP_CODE" = "404" ]; then
     # Test that module works correctly by checking dataset API instead
     print_info "Testing module functionality via dataset API..."
 
-    DATASET_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/dataset/items/$DATASET_ID")
+    DATASET_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/dataset/items/$DATASET_ID")
 
     if echo "$DATASET_RESPONSE" | jq -e '.taxonomy_term' > /dev/null; then
         print_success "✅ Module correctly adds taxonomy_term field to dataset items"
@@ -231,7 +231,7 @@ if [ "$TAXONOMY_ITEMS_HTTP_CODE" = "404" ]; then
 elif [ "$TAXONOMY_ITEMS_HTTP_CODE" = "200" ]; then
     print_success "✅ SUCCESS: taxonomy_term/items endpoint is working (SchemaRetriever patch successful)"
 
-    TAXONOMY_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items")
+    TAXONOMY_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items")
 
     # Check if response is an array
     if echo "$TAXONOMY_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then

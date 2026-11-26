@@ -1,0 +1,61 @@
+# Shared service definitions. Always combined with docker-compose.dev.yaml or
+# docker-compose.prod.yaml by ./run.sh, which also loads .env.images (all image
+# names/versions) and .env — don't run this file on its own.
+name: oneblue-data
+
+x-app-env: &app-env
+  APP_ENV: ${APP_ENV:-dev}
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: ${DB_NAME:-drupal}
+  DB_USER: ${DB_USER:-drupal}
+  DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in .env}
+  HASH_SALT: ${HASH_SALT:?HASH_SALT must be set in .env}
+  TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM: ${SMTP_FROM:-}
+  SMTP_TLS: ${SMTP_TLS:-on}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-on}
+
+services:
+  web:
+    environment:
+      <<: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  cron:
+    environment:
+      <<: *app-env
+      CRON_INTERVAL: ${CRON_INTERVAL:-60}
+    command: ["app-cron"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: ${MARIADB_IMAGE:?load .env.images}
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-drupal}
+      MARIADB_USER: ${DB_USER:-drupal}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?DB_ROOT_PASSWORD must be set in .env}
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/mariadb/dkan.cnf:/etc/mysql/conf.d/dkan.cnf:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  db-data:

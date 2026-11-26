@@ -20,7 +20,7 @@ echo
 # Step 1: Test keyword items structure (CRITICAL - should be clean)
 print_info "Step 1: Testing keyword items structure (CRITICAL - no pollution)..."
 
-KEYWORD_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/keyword/items")
+KEYWORD_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/keyword/items")
 
 # Check if response is an array
 if echo "$KEYWORD_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
@@ -101,7 +101,7 @@ echo
 # Step 3: Verify dataset items still have taxonomy functionality
 print_info "Step 3: Verifying dataset items still have taxonomy functionality..."
 
-DATASET_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/dataset/items")
+DATASET_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/dataset/items")
 
 if echo "$DATASET_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
     DATASET_COUNT=$(echo "$DATASET_ITEMS_RESPONSE" | jq 'length')
@@ -137,7 +137,7 @@ echo
 # Step 4: Test theme items (should also be clean)
 print_info "Step 4: Testing theme items for pollution..."
 
-THEME_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/theme/items")
+THEME_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/theme/items")
 
 if echo "$THEME_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
     THEME_COUNT=$(echo "$THEME_ITEMS_RESPONSE" | jq 'length')
@@ -163,7 +163,7 @@ echo
 # Step 5: Test publisher items (should also be clean)
 print_info "Step 5: Testing publisher items for pollution..."
 
-PUBLISHER_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/publisher/items")
+PUBLISHER_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/publisher/items")
 
 if echo "$PUBLISHER_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
     PUBLISHER_COUNT=$(echo "$PUBLISHER_ITEMS_RESPONSE" | jq 'length')

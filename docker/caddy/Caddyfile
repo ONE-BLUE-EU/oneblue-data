@@ -1,0 +1,6 @@
+# SITE_ADDRESS=:80                 -> plain HTTP on any host/IP
+# SITE_ADDRESS=data.one-blue.eu    -> automatic HTTPS via Let's Encrypt
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+	reverse_proxy web:80
+}

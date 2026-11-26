@@ -29,7 +29,7 @@ check_clean_state() {
     print_info "Cycle $cycle: Checking clean state..."
 
     # Module should be disabled
-    if ddev drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
+    if drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
         print_error "❌ Cycle $cycle: Module is still enabled"
         return 1
     else
@@ -67,7 +67,7 @@ check_clean_state() {
     fi
 
     # API should not expose taxonomy schemas (service provider disabled)
-    local api_schemas=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas" | jq 'keys[]' 2>/dev/null || echo "")
+    local api_schemas=$(curl -s "$BASE_URL/api/1/metastore/schemas" | jq 'keys[]' 2>/dev/null || echo "")
 
     if echo "$api_schemas" | grep -q "taxonomy_term"; then
         print_error "❌ Cycle $cycle: taxonomy_term schema still accessible via API (service provider not deactivated)"
@@ -91,7 +91,7 @@ perform_install() {
 
     local start_time=$(date +%s)
 
-    if ddev drush pm:enable dkan_taxonomy_integration -y; then
+    if drush pm:enable dkan_taxonomy_integration -y; then
         print_success "✅ Cycle $cycle: Module installed successfully"
     else
         print_error "❌ Cycle $cycle: Module installation failed"
@@ -99,7 +99,7 @@ perform_install() {
     fi
 
     print_info "Cycle $cycle: Clearing cache..."
-    ddev drush cr
+    drush cr
     sleep 1
 
     local end_time=$(date +%s)
@@ -107,7 +107,7 @@ perform_install() {
     print_info "Cycle $cycle: Install completed in ${duration}s"
 
     # Verify installation
-    if ddev drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
+    if drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
         print_success "✅ Cycle $cycle: Module is enabled"
     else
         print_error "❌ Cycle $cycle: Module is not enabled after install"
@@ -145,7 +145,7 @@ perform_install() {
     fi
 
     # Verify service provider is working - schemas should be accessible via API
-    local api_schemas=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas" | jq 'keys[]' 2>/dev/null || echo "")
+    local api_schemas=$(curl -s "$BASE_URL/api/1/metastore/schemas" | jq 'keys[]' 2>/dev/null || echo "")
 
     if echo "$api_schemas" | grep -q "taxonomy_term"; then
         print_success "✅ Cycle $cycle: taxonomy_term schema accessible via API (service provider working)"
@@ -162,7 +162,7 @@ perform_install() {
     fi
 
     # Verify individual schema content is accessible
-    local taxonomy_schema=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term" 2>/dev/null || echo "{}")
+    local taxonomy_schema=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term" 2>/dev/null || echo "{}")
     if echo "$taxonomy_schema" | jq -e '.title' > /dev/null 2>&1; then
         print_success "✅ Cycle $cycle: taxonomy_term schema content accessible and valid"
     else
@@ -178,7 +178,7 @@ perform_uninstall() {
 
     local start_time=$(date +%s)
 
-    if ddev drush pm:uninstall dkan_taxonomy_integration -y; then
+    if drush pm:uninstall dkan_taxonomy_integration -y; then
         print_success "✅ Cycle $cycle: Module uninstalled successfully"
     else
         print_error "❌ Cycle $cycle: Module uninstall failed"
@@ -186,7 +186,7 @@ perform_uninstall() {
     fi
 
     print_info "Cycle $cycle: Clearing cache..."
-    ddev drush cr
+    drush cr
     sleep 1
 
     local end_time=$(date +%s)
@@ -194,7 +194,7 @@ perform_uninstall() {
     print_info "Cycle $cycle: Uninstall completed in ${duration}s"
 
     # Verify uninstall
-    if ! ddev drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
+    if ! drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
         print_success "✅ Cycle $cycle: Module is disabled"
     else
         print_error "❌ Cycle $cycle: Module is still enabled after uninstall"
@@ -232,7 +232,7 @@ perform_uninstall() {
     fi
 
     # Verify service provider deactivated - schemas should not be accessible via API
-    local api_schemas=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas" | jq 'keys[]' 2>/dev/null || echo "")
+    local api_schemas=$(curl -s "$BASE_URL/api/1/metastore/schemas" | jq 'keys[]' 2>/dev/null || echo "")
 
     if echo "$api_schemas" | grep -q "taxonomy_term"; then
         print_error "❌ Cycle $cycle: taxonomy_term schema still accessible via API (service provider not deactivated)"
@@ -251,10 +251,10 @@ perform_uninstall() {
 
 # Initial cleanup to ensure clean starting state
 print_info "Performing initial cleanup..."
-if ddev drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
+if drush pm:list --status=enabled | grep -q dkan_taxonomy_integration; then
     print_info "Module is currently enabled - uninstalling for clean test..."
-    ddev drush pm:uninstall dkan_taxonomy_integration -y
-    ddev drush cr
+    drush pm:uninstall dkan_taxonomy_integration -y
+    drush cr
     sleep 2
 fi
 

@@ -46,7 +46,7 @@ echo
 # Step 3: Test endpoint accessibility
 print_info "Step 3: Testing endpoint accessibility..."
 
-TAXONOMY_ITEMS_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items")
+TAXONOMY_ITEMS_HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items")
 
 if [ "$TAXONOMY_ITEMS_HTTP_CODE" != "200" ]; then
     print_error "❌ taxonomy_term/items endpoint returned HTTP $TAXONOMY_ITEMS_HTTP_CODE (expected 200)"
@@ -59,7 +59,7 @@ echo
 # Step 4: Test response structure without show-reference-ids
 print_info "Step 4: Testing response structure (show-reference-ids=false)..."
 
-TAXONOMY_ITEMS_RESPONSE=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items?show-reference-ids=false")
+TAXONOMY_ITEMS_RESPONSE=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items?show-reference-ids=false")
 
 # Check if response is an array
 if ! echo "$TAXONOMY_ITEMS_RESPONSE" | jq -e 'type == "array"' > /dev/null; then
@@ -101,7 +101,7 @@ echo
 # Step 5: Test response structure with show-reference-ids=true
 print_info "Step 5: Testing response structure (show-reference-ids=true)..."
 
-TAXONOMY_ITEMS_RESPONSE_WITH_IDS=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items?show-reference-ids=true")
+TAXONOMY_ITEMS_RESPONSE_WITH_IDS=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items?show-reference-ids=true")
 
 # Check if response is an array
 if ! echo "$TAXONOMY_ITEMS_RESPONSE_WITH_IDS" | jq -e 'type == "array"' > /dev/null; then
@@ -127,17 +127,17 @@ echo
 print_info "Step 6: Testing that new terms appear in the endpoint..."
 
 # Get current count
-CURRENT_COUNT=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items" | jq 'length')
+CURRENT_COUNT=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items" | jq 'length')
 
 # Add a new term
 print_info "Adding new term: NewTestTerm"
-ddev drush dkan:add-taxonomy-terms "$VOCABULARY_ID" "NewTestTerm"
+drush dkan:add-taxonomy-terms "$VOCABULARY_ID" "NewTestTerm"
 
 # Clear cache and wait
 clear_cache_and_wait
 
 # Check new count
-NEW_COUNT=$(curl -s "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items" | jq 'length')
+NEW_COUNT=$(curl -s "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items" | jq 'length')
 
 if [ "$NEW_COUNT" -gt "$CURRENT_COUNT" ]; then
     print_success "✅ New term appears in endpoint (count: $CURRENT_COUNT → $NEW_COUNT)"
@@ -151,7 +151,7 @@ echo
 print_info "Step 7: Verifying all terms from test vocabulary are present..."
 
 # Get all terms in our vocabulary
-VOCABULARY_TERMS=$(ddev drush php:eval "
+VOCABULARY_TERMS=$(drush php:eval "
 \$terms = Drupal::entityTypeManager()->getStorage('taxonomy_term')->loadByProperties(['vid' => '$VOCABULARY_ID']);
 \$term_names = [];
 foreach (\$terms as \$term) {
@@ -184,7 +184,7 @@ echo
 print_info "Step 8: Testing endpoint behavior with invalid parameters..."
 
 # Test with invalid show-reference-ids value
-INVALID_RESPONSE=$(curl -s -w "%{http_code}" "https://dkan.ddev.site/api/1/metastore/schemas/taxonomy_term/items?show-reference-ids=invalid")
+INVALID_RESPONSE=$(curl -s -w "%{http_code}" "$BASE_URL/api/1/metastore/schemas/taxonomy_term/items?show-reference-ids=invalid")
 
 if echo "$INVALID_RESPONSE" | tail -1 | grep -q "200"; then
     print_success "✅ Endpoint handles invalid show-reference-ids gracefully"
